@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
-import { initTma } from './lib/tma';
+import { authHeaders, initTma } from './lib/tma';
 import uk from './i18n/uk.json';
 import ru from './i18n/ru.json';
 
 type Locale = 'uk' | 'ru';
-type Tab = 'catalog' | 'cart' | 'orders' | 'favorites';
+type Tab = 'catalog' | 'cart' | 'orders' | 'favorites' | 'admin';
 
 const LOCALE_KEY = 'freshdoze:locale';
 const TABS: Tab[] = ['catalog', 'cart', 'orders', 'favorites'];
+const ADMIN_ME_URL = '/v1/admin/me';
 const STRINGS: Record<Locale, Record<string, string>> = { uk, ru };
 
 function loadLocale(): Locale {
@@ -38,10 +39,10 @@ function LocaleSwitcher({ locale, onChange }: { locale: Locale; onChange: (l: Lo
   );
 }
 
-function TabBar({ tab, onChange, t }: { tab: Tab; onChange: (t: Tab) => void; t: (k: string) => string }) {
+function TabBar({ tabs, tab, onChange, t }: { tabs: Tab[]; tab: Tab; onChange: (t: Tab) => void; t: (k: string) => string }) {
   return (
     <nav className="fd-tabbar" role="navigation" aria-label="Tabs">
-      {TABS.map((id) => (
+      {tabs.map((id) => (
         <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => onChange(id)}>
           {t(id)}
         </button>
@@ -53,12 +54,26 @@ function TabBar({ tab, onChange, t }: { tab: Tab; onChange: (t: Tab) => void; t:
 export default function App() {
   const [locale, setLocale] = useState<Locale>(loadLocale);
   const [tab, setTab] = useState<Tab>('catalog');
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     initTma();
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(ADMIN_ME_URL, { headers: { ...authHeaders() } });
+        if (!cancelled && res.status === 200) setIsAdmin(true);
+      } catch {
+        if (!cancelled) setIsAdmin(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const t = (key: string): string => STRINGS[locale][key] ?? key;
+  const visibleTabs: Tab[] = isAdmin ? [...TABS, 'admin'] : TABS;
 
   return (
     <div className="fd-app">
@@ -70,7 +85,7 @@ export default function App() {
         <h1>{t(tab)}</h1>
         <p>{t('thank_you')}</p>
       </main>
-      <TabBar tab={tab} onChange={setTab} t={t} />
+      <TabBar tabs={visibleTabs} tab={tab} onChange={setTab} t={t} />
     </div>
   );
 }

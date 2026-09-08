@@ -42,7 +42,11 @@ class ProductVariant(Mapped, Base):
     """One volume offering of a product with its own price and stock."""
 
     __tablename__ = "product_variants"
-    __table_args__ = (CheckConstraint("volume_ml IN (3, 5, 10)", name="ck_volume_ml"),)
+    # NOTE: no Alembic yet; create_all covers tests — add a migration when it lands.
+    __table_args__ = (
+        CheckConstraint("volume_ml IN (3, 5, 10)", name="ck_volume_ml"),
+        CheckConstraint("stock >= 0", name="ck_stock_nonneg"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), nullable=False)
