@@ -1,0 +1,3 @@
+# Demo seed generator — stdlib only, zero dependencies.
+# Run: python generate.py --out products.json
+# Tests: ../seed/.venv/bin/pytest test_generate.py -q
