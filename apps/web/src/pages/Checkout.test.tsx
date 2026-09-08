@@ -187,17 +187,37 @@ describe('checkout submit', () => {
     expect(window.localStorage.getItem('freshdoze:cart:guest')).not.toBe('[]');
   });
 
-  it('should render a per-volume out-of-stock message with a return-to-cart link on 409', async () => {
+  it('should render per-volume stock rows from the real 409 shape with a return-to-cart link', async () => {
     const fetchImpl = vi.fn().mockResolvedValue({
       ok: false,
       status: 409,
-      json: async () => ({ detail: 'Not enough stock for volume 3 ml' }),
+      json: async () => ({
+        detail: 'out_of_stock',
+        volumes: [
+          { variant_id: 11, ml: 3, stock: 0 },
+          { variant_id: 12, ml: 5, stock: 2 },
+        ],
+      }),
     });
     renderCheckout(fetchImpl);
     fillValidForm();
     fireEvent.click(screen.getByRole('button', { name: /підтвердити|оформити|замовити/i }));
-    expect(await screen.findByText(/немає в наявності|нет в наличии|out of stock|3 ml/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /кошик|корзина|cart/i })).toHaveAttribute('href', '/cart');
+    expect(await screen.findByText('3 мл — немає в наявності')).toBeInTheDocument();
+    expect(screen.getByText('5 мл — залишилося 2 шт.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /кошик|корзина|cart/i })).toHaveAttribute('href', '#/cart');
+  });
+
+  it('should fall back to a generic message when 409 carries no volumes', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 409,
+      json: async () => ({ detail: 'out_of_stock' }),
+    });
+    renderCheckout(fetchImpl);
+    fillValidForm();
+    fireEvent.click(screen.getByRole('button', { name: /підтвердити|оформити|замовити/i }));
+    expect(await screen.findByText('Немає в наявності')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /кошик|корзина|cart/i })).toHaveAttribute('href', '#/cart');
   });
 
   it('should render field errors on 422', async () => {

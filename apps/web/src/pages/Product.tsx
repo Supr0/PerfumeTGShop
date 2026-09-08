@@ -1,15 +1,23 @@
 /**
  * ProductPage — product details: gallery placeholder, volume selector
  * with live price, description, notes pyramid, characteristics table,
- * Similar STUB section (Wave 4 fills it with real recommendations).
+ * Similar recommendations from the catalog API.
+ *
+ * Detail is fetched by id; a preloaded `product` prop skips the fetch
+ * (test seam). Similar = same-brand catalog fetch (family fallback,
+ * limit 8, self excluded) with a graceful empty.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { fetchCatalog, fetchProduct, type FetchFn } from '../lib/api';
 import { VolumeSelector } from '../components/VolumeSelector';
 import { isOutOfStock } from '../components/ProductCard';
 import type { Product, AddToCartHandler } from '../components/ProductCard';
-import { Skeleton, Toast } from '../components/feedback';
+import { ADDED_TO_CART_LABEL, Skeleton, Toast } from '../components/feedback';
 
-const ADDED_LABEL = 'Додано до кошика';
+const LOAD_ERROR_LABEL = 'Не вдалося завантажити товар.';
+const RETRY_LABEL = 'Спробувати ще';
+const SIMILAR_EMPTY_LABEL = 'Поки немає схожих товарів.';
+const SIMILAR_LIMIT = 8;
 
 /**
  * Notes arrive from the API as comma-joined strings; arrays are accepted
@@ -41,16 +49,95 @@ function defaultVolume(product: Product): number {
 }
 
 interface ProductPageProps {
+  productId?: number;
+  /** Preloaded product — skips the detail fetch (test seam). */
   product?: Product | null;
   loading?: boolean;
   onAddToCart?: AddToCartHandler;
+  /** Test seam — defaults to the global fetch. */
+  fetchImpl?: FetchFn;
 }
 
-export function ProductPage({ product = null, loading = false, onAddToCart }: ProductPageProps) {
+export function ProductPage({ productId, product: productProp, loading = false, onAddToCart, fetchImpl }: ProductPageProps) {
   const [volume, setVolume] = useState<number | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [fetched, setFetched] = useState<Product | null>(null);
+  const [detailStatus, setDetailStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>(
+    productProp !== undefined ? 'idle' : 'loading',
+  );
+  const [attempt, setAttempt] = useState(0);
+  const [similar, setSimilar] = useState<Product[]>([]);
+
+  useEffect(() => {
+    if (productProp !== undefined || productId == null) return;
+    let cancelled = false;
+    setDetailStatus('loading');
+    void fetchProduct(productId, fetchImpl ?? ((input, init) => fetch(input, init))).then(
+      (p) => {
+        if (cancelled) return;
+        setFetched(p);
+        setDetailStatus('ready');
+      },
+      () => {
+        if (!cancelled) setDetailStatus('error');
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [productProp, productId, attempt, fetchImpl]);
+
+  const product = productProp ?? fetched;
+
+  useEffect(() => {
+    if (!product) return;
+    let cancelled = false;
+    const fetcher: FetchFn = fetchImpl ?? ((input, init) => fetch(input, init));
+    void (async () => {
+      const excludeSelf = (items: Product[]) => items.filter((p) => p.id !== product.id).slice(0, SIMILAR_LIMIT);
+      if (product.brand) {
+        const brandParams = new URLSearchParams({ limit: String(SIMILAR_LIMIT) });
+        brandParams.append('brand', product.brand);
+        try {
+          const page = await fetchCatalog(brandParams, fetcher);
+          const matches = excludeSelf(page.items);
+          if (!cancelled && matches.length > 0) {
+            setSimilar(matches);
+            return;
+          }
+        } catch {
+          // Brand fetch failed — family fallback still gets a chance.
+        }
+      }
+      if (product.family) {
+        const familyParams = new URLSearchParams({ limit: String(SIMILAR_LIMIT) });
+        familyParams.append('family', product.family);
+        try {
+          const page = await fetchCatalog(familyParams, fetcher);
+          if (!cancelled) setSimilar(excludeSelf(page.items));
+        } catch {
+          if (!cancelled) setSimilar([]);
+        }
+      } else if (!cancelled) {
+        setSimilar([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [product, fetchImpl]);
 
   if (loading || product == null) {
+    if (detailStatus === 'error' && productId != null) {
+      return (
+        <section className="fd-product" aria-label="Товар">
+          <p role="alert">{LOAD_ERROR_LABEL}</p>
+          <button type="button" onClick={() => setAttempt((n) => n + 1)}>
+            {RETRY_LABEL}
+          </button>
+        </section>
+      );
+    }
     return (
       <section className="fd-product" aria-label="Товар">
         <Skeleton height={240} label="Завантаження товару…" />
@@ -67,7 +154,7 @@ export function ProductPage({ product = null, loading = false, onAddToCart }: Pr
   const handleAdd = () => {
     if (!activeVariant || isOutOfStock(activeVariant)) return;
     onAddToCart?.(product.id, activeVariant.id);
-    setToast(ADDED_LABEL);
+    setToast(ADDED_TO_CART_LABEL);
   };
 
   const notes = [
@@ -123,9 +210,19 @@ export function ProductPage({ product = null, loading = false, onAddToCart }: Pr
           </table>
         </section>
       )}
-      <section aria-label="Схожі товари (Similar)">
-        <h2>Схожі товари (Similar)</h2>
-        <p role="status">Скоро — рекомендації вже в дорозі.</p>
+      <section aria-label="Схожі товари">
+        <h2>Схожі товари</h2>
+        {similar.length === 0 ? (
+          <p role="status">{SIMILAR_EMPTY_LABEL}</p>
+        ) : (
+          <ul>
+            {similar.map((s) => (
+              <li key={s.id}>
+                <a href={`#/product/${s.id}`}>{s.name}</a>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
       {toast && <Toast message={toast} kind="success" />}
     </section>

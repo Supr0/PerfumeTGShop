@@ -65,4 +65,18 @@ describe('Orders page', () => {
     const [, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
     expect((init.headers as Record<string, string>)['X-Telegram-Init-Data']).toContain('hash=abc');
   });
+
+  it('should fetch exactly once on the prod path (no fetchImpl prop)', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, status: 200, json: async () => [] });
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      render(<Orders />);
+      await screen.findByText(/замовлень поки немає|заказов пока нет|no orders/i);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });

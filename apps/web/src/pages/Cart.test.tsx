@@ -38,7 +38,7 @@ describe('Cart page smoke', () => {
     render(<Cart />);
     expect(screen.getByText('Корзина пуста')).toBeInTheDocument();
     const link = screen.getByRole('link', { name: 'Смотреть хиты' });
-    expect(link).toHaveAttribute('href', '/');
+    expect(link).toHaveAttribute('href', '#/');
   });
 
   it('should list lines with qty controls, total, and checkout link', () => {
@@ -50,7 +50,7 @@ describe('Cart page smoke', () => {
     expect(screen.getByText('Test Parfum')).toBeInTheDocument();
     expect(screen.getByText('Итого: 250 ₴')).toBeInTheDocument();
     const checkout = screen.getByRole('link', { name: 'К оформлению' });
-    expect(checkout).toHaveAttribute('href', '/checkout');
+    expect(checkout).toHaveAttribute('href', '#/checkout');
   });
 
   it('should remove a line when delete is pressed', () => {

@@ -1,61 +1,30 @@
 /**
- * Home — catalog page: search + family chips + product grid +
- * bottom-sheet filters + skeletons + empty state.
+ * Home — catalog page wired to GET /v1/catalog.
  *
- * Cart store itself is Step 7; add-to-cart is dispatched via the
- * `onAddToCart(productId, variantId)` callback prop for now.
+ * Filter/sort/search are server-owned: every filter/search/sort change
+ * re-fetches via buildCatalogQuery (search input debounced ~300ms).
+ * Add-to-cart writes straight into the cart store.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { ProductCard, hasInStockVariant, minVariantPrice } from '../components/ProductCard';
+import { fetchCatalog, type FetchFn } from '../lib/api';
+import { addItem, loadCart, persistCart } from '../lib/cart';
+import { ProductCard } from '../components/ProductCard';
 import type { Product, AddToCartHandler } from '../components/ProductCard';
 import { FilterSheet, DEFAULT_FILTERS } from '../components/FilterSheet';
 import type { FilterValue } from '../components/FilterSheet';
-import { Skeleton, Toast } from '../components/feedback';
+import { ADDED_TO_CART_LABEL, EmptyState, Skeleton, Toast } from '../components/feedback';
 import { loadFavorites, persistFavorites, toggleFavorite } from './Favorites';
 
 const EMPTY_LABEL = 'Нічого не знайдено';
-const ADDED_LABEL = 'Додано до кошика';
+const LOAD_ERROR_LABEL = 'Не вдалося завантажити каталог.';
+const RETRY_LABEL = 'Спробувати ще';
+const RESET_LABEL = 'Скинути фільтри';
+const SEARCH_DEBOUNCE_MS = 300;
 
 /** Unique sorted values, flattening array fields (season) into individuals. */
 function unique(values: Array<string | string[] | null | undefined>): string[] {
   const flat = values.flatMap((v) => (Array.isArray(v) ? v : v == null ? [] : [v]));
   return [...new Set(flat.filter((v): v is string => typeof v === 'string' && v !== ''))].sort();
-}
-
-function matchesQuery(p: Product, query: string): boolean {
-  const q = query.trim().toLowerCase();
-  if (q === '') return true;
-  const hay = `${p.name} ${p.brand ?? ''} ${p.description ?? ''}`.toLowerCase();
-  return hay.includes(q);
-}
-
-/** Optional-field filters only apply when the product carries the field. */
-function matchesFilters(p: Product, f: FilterValue): boolean {
-  if (f.brands.length > 0 && (p.brand == null || !f.brands.includes(p.brand))) return false;
-  if (f.families.length > 0 && (p.family == null || !f.families.includes(p.family))) return false;
-  if (f.genders.length > 0 && (p.gender == null || !f.genders.includes(p.gender))) return false;
-  if (f.seasons.length > 0 && (p.season == null || !p.season.some((s) => f.seasons.includes(s))))
-    return false;
-  if (f.in_stock_only && !hasInStockVariant(p)) return false;
-  const minMajor = minVariantPrice(p) / 100;
-  if (f.price_min != null && minMajor < f.price_min) return false;
-  if (f.price_max != null && minMajor > f.price_max) return false;
-  return true;
-}
-
-function sortProducts(items: Product[], sort: FilterValue['sort']): Product[] {
-  const copy = [...items];
-  switch (sort) {
-    case 'price_asc':
-      return copy.sort((a, b) => minVariantPrice(a) - minVariantPrice(b));
-    case 'price_desc':
-      return copy.sort((a, b) => minVariantPrice(b) - minVariantPrice(a));
-    case 'new':
-      return copy.sort((a, b) => b.id - a.id);
-    case 'popular':
-    default:
-      return copy.sort((a, b) => Number(b.is_hit ?? false) - Number(a.is_hit ?? false));
-  }
 }
 
 /**
@@ -85,41 +54,85 @@ export function buildCatalogQuery(filters: FilterValue, query: string): URLSearc
 }
 
 interface HomeProps {
-  products?: Product[];
-  loading?: boolean;
+  /** Test seam — defaults to the global fetch. */
+  fetchImpl?: FetchFn;
   onAddToCart?: AddToCartHandler;
 }
 
-export function Home({ products = [], loading = false, onAddToCart }: HomeProps) {
+export function Home({ fetchImpl, onAddToCart }: HomeProps) {
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [activeFamily, setActiveFamily] = useState<string>('all');
   const [sheetOpen, setSheetOpen] = useState(false);
   const [filters, setFilters] = useState<FilterValue>(DEFAULT_FILTERS);
   const [favorites, setFavorites] = useState<string[]>(() => loadFavorites());
+  const [items, setItems] = useState<Product[]>([]);
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [attempt, setAttempt] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     persistFavorites(favorites);
   }, [favorites]);
 
-  const families = useMemo(() => unique(products.map((p) => p.family)), [products]);
-  const brands = useMemo(() => unique(products.map((p) => p.brand)), [products]);
-  const genders = useMemo(() => unique(products.map((p) => p.gender)), [products]);
-  const seasons = useMemo(() => unique(products.map((p) => p.season)), [products]);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [query]);
 
-  const visible = useMemo(() => {
-    const filtered = products.filter(
-      (p) =>
-        matchesQuery(p, query) &&
-        (activeFamily === 'all' || p.family === activeFamily) &&
-        matchesFilters(p, filters),
+  useEffect(() => {
+    let cancelled = false;
+    setStatus('loading');
+    const params = buildCatalogQuery(filters, debouncedQuery);
+    if (activeFamily !== 'all') params.append('family', activeFamily);
+    void fetchCatalog(params, fetchImpl ?? ((input, init) => fetch(input, init))).then(
+      (page) => {
+        if (cancelled) return;
+        setItems(page.items);
+        setStatus('ready');
+      },
+      () => {
+        if (!cancelled) setStatus('error');
+      },
     );
-    return sortProducts(filtered, filters.sort);
-  }, [products, query, activeFamily, filters]);
+    return () => {
+      cancelled = true;
+    };
+  }, [filters, debouncedQuery, activeFamily, attempt, fetchImpl]);
+
+  const families = useMemo(() => unique(items.map((p) => p.family)), [items]);
+  const brands = useMemo(() => unique(items.map((p) => p.brand)), [items]);
+  const genders = useMemo(() => unique(items.map((p) => p.gender)), [items]);
+  const seasons = useMemo(() => unique(items.map((p) => p.season)), [items]);
+
+  const resetAll = () => {
+    setFilters(DEFAULT_FILTERS);
+    setQuery('');
+    setDebouncedQuery('');
+    setActiveFamily('all');
+    setAttempt((n) => n + 1);
+  };
 
   const handleAdd: AddToCartHandler = (productId, variantId) => {
+    const product = items.find((p) => p.id === productId);
+    const variant = product?.variants.find((v) => v.id === variantId);
+    if (product && variant) {
+      const next = addItem(
+        loadCart(),
+        {
+          productId: String(productId),
+          variantId,
+          volume_ml: variant.volume_ml,
+          qty: 1,
+          price: variant.price_minor_uah / 100,
+          name: product.name,
+        },
+        variant.stock,
+      );
+      persistCart(next);
+    }
     onAddToCart?.(productId, variantId);
-    setToast(ADDED_LABEL);
+    setToast(ADDED_TO_CART_LABEL);
   };
 
   const toggleHeart = (productId: number) => {
@@ -168,17 +181,31 @@ export function Home({ products = [], loading = false, onAddToCart }: HomeProps)
         onClose={() => setSheetOpen(false)}
         onReset={() => setFilters(DEFAULT_FILTERS)}
       />
-      {loading ? (
+      {status === 'loading' ? (
         <div className="fd-grid" aria-label="Завантаження каталогу">
           {Array.from({ length: 6 }, (_, i) => (
             <Skeleton key={i} height={180} label="Завантаження…" />
           ))}
         </div>
-      ) : visible.length === 0 ? (
-        <p role="status">{EMPTY_LABEL}</p>
+      ) : status === 'error' ? (
+        <div>
+          <p role="alert">{LOAD_ERROR_LABEL}</p>
+          <button type="button" onClick={() => setAttempt((n) => n + 1)}>
+            {RETRY_LABEL}
+          </button>
+        </div>
+      ) : items.length === 0 ? (
+        <EmptyState
+          title={EMPTY_LABEL}
+          action={
+            <button type="button" onClick={resetAll}>
+              {RESET_LABEL}
+            </button>
+          }
+        />
       ) : (
         <div className="fd-grid">
-          {visible.map((p) => (
+          {items.map((p) => (
             <ProductCard
               key={p.id}
               product={p}

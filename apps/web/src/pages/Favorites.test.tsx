@@ -48,7 +48,7 @@ describe('Favorites page smoke', () => {
   it('should render the empty state', () => {
     render(<Favorites />);
     expect(screen.getByText('В избранном пока пусто')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Перейти к каталогу' })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('link', { name: 'Перейти к каталогу' })).toHaveAttribute('href', '#/');
   });
 
   it('should list hearts stored in localStorage', () => {

@@ -38,3 +38,23 @@ export function Toast({ message, kind = 'info', action }: ToastProps) {
     </div>
   );
 }
+
+/** Single-source toast copy for a successful add-to-cart. */
+export const ADDED_TO_CART_LABEL = 'Додано до кошика';
+
+interface EmptyStateProps {
+  title: string;
+  hint?: string;
+  action?: ReactNode;
+}
+
+/** Graceful empty state shared by catalog/cart/favorites lists. */
+export function EmptyState({ title, hint, action }: EmptyStateProps) {
+  return (
+    <div className="fd-empty" role="status">
+      <p className="fd-empty__title">{title}</p>
+      {hint && <p className="fd-empty__hint">{hint}</p>}
+      {action}
+    </div>
+  );
+}

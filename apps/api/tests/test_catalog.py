@@ -3,7 +3,7 @@
 Contract under test (apps/api/routers/catalog.py, prefix /v1):
   GET /v1/catalog?brand=&family=&gender=&season=&min_price=&max_price=
       &in_stock=&sort=&q=&limit=&offset= -> {items[], total}
-    - brand/family repeatable; gender/season single value
+    - brand/family/gender/season repeatable (?gender=M&gender=F is union);
     - min_price/max_price are minor UAH; min>max -> 422
     - in_stock=true keeps products with ANY variant stock>0
     - sort in {popular(default),price_asc,price_desc,new};
@@ -16,8 +16,7 @@ Contract under test (apps/api/routers/catalog.py, prefix /v1):
 Edge behavior defined here (server never trusts client):
   - family/gender/season/notes/longevity/sillage/place_tags/image columns
     exist on Product (see apps/api/models/product.py) and the router
-    filters on them directly; brand/family accept repeated params,
-    gender/season accept a single value each.
+    filters on them directly; brand/family/gender/season accept repeated params,
   - q wildcards (%, _, \\) are escaped so user input matches literally.
   - in_stock=false/omitted -> no stock filter.
   - limit default 20, max 100; invalid sort -> 422 (FastAPI validation).
@@ -283,6 +282,35 @@ async def test_q_underscore_is_literal_not_wildcard() -> None:
     async with _client() as (client, _):
         body = (await client.get("/v1/catalog", params={"q": "_"})).json()
     assert body == {"items": [], "total": 0}
+
+
+async def test_gender_single_value_still_filters() -> None:
+    async with _client() as (client, ids):
+        body = (await client.get("/v1/catalog", params={"gender": "F"})).json()
+    assert body["total"] == 1
+    assert _ids_in_order(body) == [ids["p1"]]
+
+
+async def test_gender_multi_value_returns_union() -> None:
+    async with _client() as (client, ids):
+        resp = await client.get(
+            "/v1/catalog", params=[("gender", "M"), ("gender", "F")]
+        )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] == 2
+    assert set(_ids_in_order(body)) == {ids["p1"], ids["p2"]}
+
+
+async def test_season_multi_value_returns_union() -> None:
+    async with _client() as (client, ids):
+        resp = await client.get(
+            "/v1/catalog", params=[("season", "spring"), ("season", "summer")]
+        )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] == 3
+    assert set(_ids_in_order(body)) == {ids["p1"], ids["p3"], ids["p4"]}
 
 
 async def test_detail_includes_notes_and_characteristics() -> None:

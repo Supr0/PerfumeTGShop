@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { EmptyState } from '../components/feedback';
 import { getOwnerId, getStorage } from '../lib/cart';
 
 const FAVORITES_PREFIX = 'freshdoze:favorites';
@@ -54,8 +55,7 @@ export default function Favorites({ resolveName = (id) => id }: FavoritesPagePro
     return (
       <section aria-label="Избранное">
         <h1>Избранное</h1>
-        <p>В избранном пока пусто</p>
-        <a href="/">Перейти к каталогу</a>
+        <EmptyState title="В избранном пока пусто" action={<a href="#/">Перейти к каталогу</a>} />
       </section>
     );
   }

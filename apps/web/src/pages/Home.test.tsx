@@ -1,8 +1,31 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { Home, buildCatalogQuery } from './Home';
 import type { Product } from '../components/ProductCard';
 import { DEFAULT_FILTERS } from '../components/FilterSheet';
+import { loadCart } from '../lib/cart';
+
+class MemoryStorage implements Storage {
+  private data = new Map<string, string>();
+  get length(): number {
+    return this.data.size;
+  }
+  key(index: number): string | null {
+    return [...this.data.keys()][index] ?? null;
+  }
+  getItem(key: string): string | null {
+    return this.data.get(key) ?? null;
+  }
+  setItem(key: string, value: string): void {
+    this.data.set(key, value);
+  }
+  removeItem(key: string): void {
+    this.data.delete(key);
+  }
+  clear(): void {
+    this.data.clear();
+  }
+}
 
 const products: Product[] = [
   {
@@ -31,47 +54,75 @@ const products: Product[] = [
   },
 ];
 
-describe('Home', () => {
+function catalogResponse(items: Product[] = products) {
+  return { ok: true, status: 200, json: async () => ({ items, total: items.length }) };
+}
+
+beforeEach(() => {
+  Object.defineProperty(window, 'localStorage', { value: new MemoryStorage(), configurable: true });
+  vi.restoreAllMocks();
+  delete (window as unknown as { Telegram?: unknown }).Telegram;
+});
+
+afterEach(() => cleanup());
+
+describe('Home (wired to the real catalog API)', () => {
   it('should show skeletons while loading', () => {
-    render(<Home loading products={[]} />);
+    const fetchImpl = vi.fn().mockReturnValue(new Promise(() => {}));
+    render(<Home fetchImpl={fetchImpl} />);
     expect(screen.getAllByRole('status').length).toBeGreaterThanOrEqual(1);
+    expect(fetchImpl).toHaveBeenCalled();
   });
 
-  it('should show empty state when no items match', () => {
-    render(<Home products={[]} />);
-    expect(screen.getByText(/нічого не знайдено|ничего не найдено|no products|empty/i)).toBeInTheDocument();
-  });
-
-  it('should render search, family chips, grid and Filters button', () => {
-    render(<Home products={products} />);
-    expect(screen.getByRole('searchbox')).toBeInTheDocument();
-    expect(screen.getByText('citrus')).toBeInTheDocument();
-    expect(screen.getByText('Aventus')).toBeInTheDocument();
+  it('should render the server list after load', async () => {
+    render(<Home fetchImpl={vi.fn().mockResolvedValue(catalogResponse())} />);
+    expect(await screen.findByText('Aventus')).toBeInTheDocument();
     expect(screen.getByText('Sauvage')).toBeInTheDocument();
+    expect(screen.getByRole('searchbox')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /фільтри|фильтры|filters/i })).toBeInTheDocument();
   });
 
-  it('should filter grid by search input', () => {
-    render(<Home products={products} />);
+  it('should show an empty state with reset when the server returns nothing', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(catalogResponse([]));
+    render(<Home fetchImpl={fetchImpl} />);
+    expect(await screen.findByText(/нічого не знайдено/i)).toBeInTheDocument();
+    const callsBefore = fetchImpl.mock.calls.length;
+    fireEvent.click(screen.getByRole('button', { name: /скинути/i }));
+    await waitFor(() => {
+      expect(fetchImpl.mock.calls.length).toBeGreaterThan(callsBefore);
+    });
+  });
+
+  it('should show an error with retry on network failure', async () => {
+    const fetchImpl = vi.fn().mockRejectedValue(new Error('down'));
+    render(<Home fetchImpl={fetchImpl} />);
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    fetchImpl.mockResolvedValue(catalogResponse());
+    fireEvent.click(screen.getByRole('button', { name: /спробувати ще/i }));
+    expect(await screen.findByText('Aventus')).toBeInTheDocument();
+  });
+
+  it('should forward the debounced search text to the catalog query', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(catalogResponse([]));
+    render(<Home fetchImpl={fetchImpl} />);
+    await screen.findByText(/нічого не знайдено/i);
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Sauvage' } });
-    expect(screen.getByText('Sauvage')).toBeInTheDocument();
-    expect(screen.queryByText('Aventus')).not.toBeInTheDocument();
+    await waitFor(() => {
+      const calls = fetchImpl.mock.calls;
+      const last = calls[calls.length - 1][0] as string;
+      expect(last).toContain('q=Sauvage');
+    });
   });
 
-  it('should filter grid by season intersection via the filter sheet', () => {
-    render(<Home products={products} />);
-    fireEvent.click(screen.getByRole('button', { name: /фільтри|фильтры|filters/i }));
-    fireEvent.click(screen.getByText('winter'));
-    expect(screen.getByText('Sauvage')).toBeInTheDocument();
-    expect(screen.queryByText('Aventus')).not.toBeInTheDocument();
-  });
-
-  it('should show toast after add-to-cart callback', () => {
+  it('should add the first in-stock variant to the cart store with a toast', async () => {
     const onAddToCart = vi.fn();
-    render(<Home products={products} onAddToCart={onAddToCart} />);
-    const addButtons = screen.getAllByRole('button', { name: /додати|добавить|add/i });
+    render(<Home fetchImpl={vi.fn().mockResolvedValue(catalogResponse())} onAddToCart={onAddToCart} />);
+    const addButtons = await screen.findAllByRole('button', { name: /додати/i });
     fireEvent.click(addButtons[0]);
-    expect(onAddToCart).toHaveBeenCalled();
+    expect(onAddToCart).toHaveBeenCalledWith(1, 11);
+    expect(loadCart()).toEqual([
+      expect.objectContaining({ productId: '1', variantId: 11, volume_ml: 3, qty: 1 }),
+    ]);
     expect(screen.getByText(/додано|добавлено|added/i)).toBeInTheDocument();
   });
 });

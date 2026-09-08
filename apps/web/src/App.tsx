@@ -2,6 +2,13 @@ import { useEffect, useState } from 'react';
 import { authHeaders, initTma } from './lib/tma';
 import uk from './i18n/uk.json';
 import ru from './i18n/ru.json';
+import { Home } from './pages/Home';
+import { ProductPage } from './pages/Product';
+import Cart from './pages/Cart';
+import Checkout from './pages/Checkout';
+import Orders from './pages/Orders';
+import Favorites from './pages/Favorites';
+import Admin from './pages/Admin';
 
 type Locale = 'uk' | 'ru';
 type Tab = 'catalog' | 'cart' | 'orders' | 'favorites' | 'admin';
@@ -10,6 +17,70 @@ const LOCALE_KEY = 'freshdoze:locale';
 const TABS: Tab[] = ['catalog', 'cart', 'orders', 'favorites'];
 const ADMIN_ME_URL = '/v1/admin/me';
 const STRINGS: Record<Locale, Record<string, string>> = { uk, ru };
+
+export type RouteName = 'catalog' | 'product' | 'cart' | 'checkout' | 'orders' | 'favorites' | 'admin';
+
+export interface Route {
+  name: RouteName;
+  productId?: number;
+}
+
+/** Minimal hash routing (no router dep): #/ #/product/:id #/cart #/checkout #/orders #/favorites #/admin. */
+export function parseHash(hash: string): Route {
+  const path = hash.replace(/^#/, '') || '/';
+  const productMatch = path.match(/^\/product\/(\d+)$/);
+  if (productMatch) return { name: 'product', productId: Number(productMatch[1]) };
+  switch (path) {
+    case '/':
+    case '':
+      return { name: 'catalog' };
+    case '/cart':
+      return { name: 'cart' };
+    case '/checkout':
+      return { name: 'checkout' };
+    case '/orders':
+      return { name: 'orders' };
+    case '/favorites':
+      return { name: 'favorites' };
+    case '/admin':
+      return { name: 'admin' };
+    default:
+      return { name: 'catalog' };
+  }
+}
+
+function routeToTab(route: Route): Tab {
+  switch (route.name) {
+    case 'cart':
+    case 'checkout':
+      return 'cart';
+    case 'orders':
+      return 'orders';
+    case 'favorites':
+      return 'favorites';
+    case 'admin':
+      return 'admin';
+    case 'product':
+    case 'catalog':
+    default:
+      return 'catalog';
+  }
+}
+
+function tabToHash(tab: Tab): string {
+  switch (tab) {
+    case 'catalog':
+      return '#/';
+    case 'cart':
+      return '#/cart';
+    case 'orders':
+      return '#/orders';
+    case 'favorites':
+      return '#/favorites';
+    case 'admin':
+      return '#/admin';
+  }
+}
 
 function loadLocale(): Locale {
   try {
@@ -51,9 +122,17 @@ function TabBar({ tabs, tab, onChange, t }: { tabs: Tab[]; tab: Tab; onChange: (
   );
 }
 
+function readRoute(): Route {
+  try {
+    return parseHash(window.location.hash);
+  } catch {
+    return { name: 'catalog' };
+  }
+}
+
 export default function App() {
   const [locale, setLocale] = useState<Locale>(loadLocale);
-  const [tab, setTab] = useState<Tab>('catalog');
+  const [route, setRoute] = useState<Route>(readRoute);
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
@@ -67,13 +146,17 @@ export default function App() {
         if (!cancelled) setIsAdmin(false);
       }
     })();
+    const onHashChange = () => setRoute(readRoute());
+    window.addEventListener('hashchange', onHashChange);
     return () => {
       cancelled = true;
+      window.removeEventListener('hashchange', onHashChange);
     };
   }, []);
 
   const t = (key: string): string => STRINGS[locale][key] ?? key;
   const visibleTabs: Tab[] = isAdmin ? [...TABS, 'admin'] : TABS;
+  const tab = routeToTab(route);
 
   return (
     <div className="fd-app">
@@ -82,10 +165,25 @@ export default function App() {
         <LocaleSwitcher locale={locale} onChange={setLocale} />
       </header>
       <main className="fd-main">
-        <h1>{t(tab)}</h1>
-        <p>{t('thank_you')}</p>
+        {route.name === 'catalog' && <Home />}
+        {route.name === 'product' && route.productId != null && (
+          <ProductPage key={route.productId} productId={route.productId} />
+        )}
+        {route.name === 'cart' && <Cart />}
+        {route.name === 'checkout' && <Checkout />}
+        {route.name === 'orders' && <Orders />}
+        {route.name === 'favorites' && <Favorites />}
+        {route.name === 'admin' && <Admin />}
       </main>
-      <TabBar tabs={visibleTabs} tab={tab} onChange={setTab} t={t} />
+      <TabBar
+        tabs={visibleTabs}
+        tab={tab}
+        onChange={(next) => {
+          window.location.hash = tabToHash(next);
+          setRoute(parseHash(tabToHash(next)));
+        }}
+        t={t}
+      />
     </div>
   );
 }

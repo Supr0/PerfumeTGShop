@@ -59,8 +59,8 @@ def _variant_exists(*conditions: object) -> object:
 async def list_catalog(
     brand: list[str] | None = Query(default=None),
     family: list[str] | None = Query(default=None),
-    gender: str | None = Query(default=None),
-    season: str | None = Query(default=None),
+    gender: list[str] | None = Query(default=None),
+    season: list[str] | None = Query(default=None),
     min_price: int | None = Query(default=None, ge=0),
     max_price: int | None = Query(default=None, ge=0),
     in_stock: bool | None = Query(default=None),
@@ -80,9 +80,9 @@ async def list_catalog(
     if family:
         wheres.append(Product.family.in_(family))
     if gender:
-        wheres.append(Product.gender == gender)
+        wheres.append(Product.gender.in_(gender))
     if season:
-        wheres.append(_season_contains(season))
+        wheres.append(or_(*[_season_contains(value) for value in season]))
     if min_price is not None:
         wheres.append(_variant_exists(ProductVariant.price_minor_uah >= min_price))
     if max_price is not None:

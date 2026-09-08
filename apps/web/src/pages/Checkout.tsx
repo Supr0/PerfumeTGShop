@@ -10,6 +10,7 @@
  */
 import { useState } from 'react';
 import { authHeaders } from '../lib/tma';
+import { parseOutOfStockVolumes, type OutOfStockVolume } from '../lib/api';
 import { cartTotal, loadCart, persistCart, type CartState } from '../lib/cart';
 
 export const CHECKOUT_URL = '/v1/orders';
@@ -146,6 +147,7 @@ export default function Checkout({ fetchImpl = defaultFetch, checkoutUrl = CHECK
   const [orderNumber, setOrderNumber] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [outOfStock, setOutOfStock] = useState(false);
+  const [outOfStockVolumes, setOutOfStockVolumes] = useState<OutOfStockVolume[]>([]);
   const [serverMessages, setServerMessages] = useState<string[]>([]);
 
   const set = (key: keyof CheckoutForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -157,7 +159,7 @@ export default function Checkout({ fetchImpl = defaultFetch, checkoutUrl = CHECK
       <section aria-label="Замовлення оформлено">
         <h1>{`Дякуємо! Замовлення №${orderNumber}`}</h1>
         <p>Ми напишемо вам для підтвердження оплати.</p>
-        <a href="/orders">Мої замовлення</a>
+        <a href="#/orders">Мої замовлення</a>
       </section>
     );
   }
@@ -167,7 +169,7 @@ export default function Checkout({ fetchImpl = defaultFetch, checkoutUrl = CHECK
       <section aria-label="Оформлення замовлення">
         <h1>Оформлення замовлення</h1>
         <p>Кошик порожній</p>
-        <a href="/">До каталогу</a>
+        <a href="#/">До каталогу</a>
       </section>
     );
   }
@@ -181,6 +183,7 @@ export default function Checkout({ fetchImpl = defaultFetch, checkoutUrl = CHECK
     setPending(true);
     setSubmitError(null);
     setOutOfStock(false);
+    setOutOfStockVolumes([]);
     setServerMessages([]);
     const idempotencyKey = newIdempotencyKey();
     try {
@@ -205,11 +208,10 @@ export default function Checkout({ fetchImpl = defaultFetch, checkoutUrl = CHECK
         return;
       }
       if (res.status === 409) {
-        const detail =
-          typeof payload === 'object' && payload !== null && 'detail' in payload
-            ? String((payload as { detail: unknown }).detail)
-            : '';
-        setSubmitError(`Немає в наявності${detail !== '' ? `: ${detail}` : ''}`);
+        // Real server shape: {detail:"out_of_stock", volumes:[{variant_id, ml, stock}]}.
+        const volumes = parseOutOfStockVolumes(payload);
+        setOutOfStockVolumes(volumes);
+        setSubmitError('Немає в наявності');
         setOutOfStock(true);
         return;
       }
@@ -296,7 +298,16 @@ export default function Checkout({ fetchImpl = defaultFetch, checkoutUrl = CHECK
           </div>
         )}
         {submitError && <p role="alert">{submitError}</p>}
-        {outOfStock && <a href="/cart">Повернутися до кошика</a>}
+        {outOfStock && outOfStockVolumes.length > 0 && (
+          <ul aria-label="Наявність за обʼємами">
+            {outOfStockVolumes.map((v) => (
+              <li key={v.variant_id}>
+                {v.stock <= 0 ? `${v.ml} мл — немає в наявності` : `${v.ml} мл — залишилося ${v.stock} шт.`}
+              </li>
+            ))}
+          </ul>
+        )}
+        {outOfStock && <a href="#/cart">Повернутися до кошика</a>}
         <button type="submit" disabled={pending}>
           Підтвердити замовлення
         </button>

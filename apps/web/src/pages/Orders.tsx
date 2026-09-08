@@ -10,6 +10,9 @@ import type { FetchImpl } from './Checkout';
 
 export const ORDERS_URL = '/v1/orders/mine';
 
+/** Module-level stable default so the prod path (no fetchImpl) keeps fetcher identity. */
+const defaultFetch: FetchImpl = (input, init) => fetch(input, init);
+
 // TODO: resolve the seller username from GET /settings/public — Wave: wire to API.
 export const SELLER_HREF = 'https://t.me/freshdoze_catalog_bot';
 
@@ -47,8 +50,7 @@ interface OrdersProps {
 }
 
 export default function Orders({ fetchImpl, listUrl = ORDERS_URL }: OrdersProps) {
-  const fetcher: FetchImpl =
-    fetchImpl ?? ((input, init) => fetch(input, init));
+  const fetcher: FetchImpl = fetchImpl ?? defaultFetch;
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [orders, setOrders] = useState<MineOrder[]>([]);
   const [attempt, setAttempt] = useState(0);
@@ -102,7 +104,7 @@ export default function Orders({ fetchImpl, listUrl = ORDERS_URL }: OrdersProps)
       <section aria-label="Замовлення">
         <h1>Замовлення</h1>
         <p>Замовлень поки немає</p>
-        <a href="/">До каталогу</a>
+        <a href="#/">До каталогу</a>
       </section>
     );
   }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { EmptyState } from '../components/feedback';
 import {
   MAX_QTY,
   cartTotal,
@@ -43,8 +44,7 @@ export default function Cart({
     return (
       <section aria-label="Корзина">
         <h1>Корзина</h1>
-        <p>Корзина пуста</p>
-        <a href="/">Смотреть хиты</a>
+        <EmptyState title="Корзина пуста" action={<a href="#/">Смотреть хиты</a>} />
       </section>
     );
   }
@@ -124,7 +124,7 @@ export default function Cart({
       <p>
         Итого: {cartTotal(lines)} ₴
       </p>
-      <a href="/checkout">К оформлению</a>
+      <a href="#/checkout">К оформлению</a>
     </section>
   );
 }
