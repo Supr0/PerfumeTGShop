@@ -79,7 +79,7 @@ describe('checkout phone validation (mirrors server ^\\+380\\d{9}$)', () => {
     fireEvent.change(screen.getByLabelText(/телефон/i), { target: { value: '0501234567' } });
     fireEvent.click(screen.getByRole('button', { name: /підтвердити|оформити|замовити/i }));
     expect(await screen.findByText(/\+380/i)).toBeInTheDocument();
-    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(fetchImpl.mock.calls.some(([url]) => url === '/v1/orders')).toBe(false);
   });
 });
 
@@ -94,7 +94,11 @@ describe('checkout submit', () => {
     fillValidForm();
     fireEvent.click(screen.getByRole('button', { name: /підтвердити|оформити|замовити/i }));
     await screen.findByText(/Дякуємо! Замовлення №AB12CD34/);
-    const [, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
+    const orderCall = fetchImpl.mock.calls.find(([url]) => url === '/v1/orders') as
+      | [string, RequestInit]
+      | undefined;
+    expect(orderCall).toBeDefined();
+    const [, init] = orderCall as [string, RequestInit];
     const body = JSON.parse(String(init.body));
     expect(body.items).toEqual([{ variant_id: 11, qty: 2 }]);
     expect(body).not.toHaveProperty('total');
@@ -131,10 +135,19 @@ describe('checkout submit', () => {
         resolveFirst = resolve;
       },
     );
-    const fetchImpl = vi
-      .fn()
-      .mockReturnValueOnce(first)
-      .mockResolvedValueOnce({ ok: true, status: 201, json: async () => ({ number: 'ZZ99YY88' }) });
+    let orderCalls = 0;
+    const fetchImpl = vi.fn().mockImplementation((url: string) => {
+      if (url === '/v1/settings/public') {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ card_requisites: 'Картка 4111 1111 1111 1111' }),
+        });
+      }
+      orderCalls += 1;
+      if (orderCalls === 1) return first;
+      return Promise.resolve({ ok: true, status: 201, json: async () => ({ number: 'ZZ99YY88' }) });
+    });
     renderCheckout(fetchImpl);
     fillValidForm();
     const submit = screen.getByRole('button', { name: /підтвердити|оформити|замовити/i });
@@ -150,8 +163,11 @@ describe('checkout submit', () => {
     fillValidForm();
     fireEvent.click(screen.getByRole('button', { name: /підтвердити|оформити|замовити/i }));
     await screen.findByText(/Дякуємо! Замовлення №ZZ99YY88/);
-    const key1 = (fetchImpl.mock.calls[0][1] as RequestInit).headers as Record<string, string>;
-    const key2 = (fetchImpl.mock.calls[1][1] as RequestInit).headers as Record<string, string>;
+    const orderInits = fetchImpl.mock.calls
+      .filter(([url]) => url === '/v1/orders')
+      .map(([, init]) => init as RequestInit);
+    const key1 = orderInits[0].headers as Record<string, string>;
+    const key2 = orderInits[1].headers as Record<string, string>;
     expect(key1['Idempotency-Key']).toMatch(/.+/);
     expect(key2['Idempotency-Key']).toMatch(/.+/);
     expect(key1['Idempotency-Key']).not.toBe(key2['Idempotency-Key']);
@@ -238,11 +254,39 @@ describe('checkout submit', () => {
     expect(screen.getByText(/City is required/)).toBeInTheDocument();
   });
 
-  it('should render the payment requisites stub and buyer-pays-delivery note', () => {
-    const fetchImpl = vi.fn();
+  it('should render requisites text from the public settings API', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        dispatch_city: 'Львів',
+        card_requisites: 'Картка 4111 1111 1111 1111',
+        payment_enabled: false,
+      }),
+    });
     renderCheckout(fetchImpl);
-    expect(screen.getByText(/доставку сплачує покупець|доставка.*покупател/i)).toBeInTheDocument();
-    expect(screen.getByText(/реквізити|реквизиты/i)).toBeInTheDocument();
+    expect(await screen.findByText('Картка 4111 1111 1111 1111')).toBeInTheDocument();
+    expect(screen.getByText(/доставку сплачує покупець/i)).toBeInTheDocument();
+    expect(fetchImpl).toHaveBeenCalledWith(
+      '/v1/settings/public',
+      expect.objectContaining({ headers: expect.anything() }),
+    );
+  });
+
+  it('should show a neutral skeleton while requisites load', () => {
+    const fetchImpl = vi.fn().mockImplementation(() => new Promise(() => {}));
+    renderCheckout(fetchImpl);
+    expect(screen.getByLabelText('Завантаження реквізитів…')).toBeInTheDocument();
+    expect(screen.queryByText('Картка 4111 1111 1111 1111')).not.toBeInTheDocument();
+    expect(screen.getByText(/доставку сплачує покупець/i)).toBeInTheDocument();
+  });
+
+  it('should show a generic fallback with seller link when requisites fail', async () => {
+    const fetchImpl = vi.fn().mockRejectedValue(new Error('network'));
+    renderCheckout(fetchImpl);
+    expect(await screen.findByText('Реквізити уточнить менеджер')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /написати продавцю/i })).toBeInTheDocument();
+    expect(screen.getByText(/доставку сплачує покупець/i)).toBeInTheDocument();
   });
 
   it('should offer the preset city list with Lviv default while allowing free text', () => {
@@ -264,6 +308,6 @@ describe('checkout submit', () => {
     await waitFor(() => {
       expect(screen.getByText(/500/i)).toBeInTheDocument();
     });
-    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(fetchImpl.mock.calls.some(([url]) => url === '/v1/orders')).toBe(false);
   });
 });

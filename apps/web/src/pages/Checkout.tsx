@@ -8,12 +8,17 @@
  * Totals are DISPLAY-ONLY — the server recomputes them, so no total field
  * is ever sent (see prior lesson).
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { authHeaders } from '../lib/tma';
 import { parseOutOfStockVolumes, type OutOfStockVolume } from '../lib/api';
 import { cartTotal, loadCart, persistCart, type CartState } from '../lib/cart';
+import { Skeleton } from '../components/feedback';
 
 export const CHECKOUT_URL = '/v1/orders';
+export const PUBLIC_SETTINGS_URL = '/v1/settings/public';
+export const PAYMENT_LOADING_LABEL = 'Завантаження реквізитів…';
+export const PAYMENT_FALLBACK_LABEL = 'Реквізити уточнить менеджер';
+export const SELLER_HREF = 'https://t.me/freshdoze_catalog_bot';
 
 export const NAME_MAX = 80;
 export const CITY_MAX = 120;
@@ -27,9 +32,11 @@ export const CITIES = ['Львів', 'Київ', 'Одеса', 'Дніпро', '
 /** Wave: NP directory API — sample branch labels, free-text entry stays allowed. */
 export const BRANCHES = ['Відділення №1', 'Відділення №2', 'Відділення №3'];
 
-// TODO: render requisites from GET /settings/public — Wave: wire to API.
-export const PAYMENT_REQUISITES_STUB =
-  "Реквізити для переказу на картку з'являться з /settings/public — Wave: wire to API";
+interface PublicSettings {
+  dispatch_city: string;
+  card_requisites: string;
+  payment_enabled: boolean;
+}
 
 export interface OrderApiResponse {
   ok: boolean;
@@ -135,11 +142,17 @@ function parseFieldErrors(payload: unknown): string[] | null {
 interface CheckoutProps {
   fetchImpl?: FetchImpl;
   checkoutUrl?: string;
+  settingsUrl?: string;
   /** Test seam — defaults to the real cart store. */
   initialItems?: CartState;
 }
 
-export default function Checkout({ fetchImpl = defaultFetch, checkoutUrl = CHECKOUT_URL, initialItems }: CheckoutProps) {
+export default function Checkout({
+  fetchImpl = defaultFetch,
+  checkoutUrl = CHECKOUT_URL,
+  settingsUrl = PUBLIC_SETTINGS_URL,
+  initialItems,
+}: CheckoutProps) {
   const [items] = useState<CartState>(() => initialItems ?? loadCart());
   const [form, setForm] = useState<CheckoutForm>({ name: '', phone: '', city: 'Львів', branch: '', comment: '' });
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -149,6 +162,36 @@ export default function Checkout({ fetchImpl = defaultFetch, checkoutUrl = CHECK
   const [outOfStock, setOutOfStock] = useState(false);
   const [outOfStockVolumes, setOutOfStockVolumes] = useState<OutOfStockVolume[]>([]);
   const [serverMessages, setServerMessages] = useState<string[]>([]);
+  const [paymentStatus, setPaymentStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [requisites, setRequisites] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetchImpl(settingsUrl, { headers: { ...authHeaders() } });
+        if (!res.ok) {
+          if (!cancelled) setPaymentStatus('error');
+          return;
+        }
+        const payload = (await res.json().catch(() => null)) as Partial<PublicSettings> | null;
+        const text = typeof payload?.card_requisites === 'string' ? payload.card_requisites.trim() : '';
+        if (!cancelled) {
+          if (text !== '') {
+            setRequisites(text);
+            setPaymentStatus('ready');
+          } else {
+            setPaymentStatus('error');
+          }
+        }
+      } catch {
+        if (!cancelled) setPaymentStatus('error');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchImpl, settingsUrl]);
 
   const set = (key: keyof CheckoutForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setForm((prev) => ({ ...prev, [key]: e.target.value }));
@@ -287,7 +330,18 @@ export default function Checkout({ fetchImpl = defaultFetch, checkoutUrl = CHECK
         <section aria-label="Оплата">
           <h2>Оплата</h2>
           <p>Оплата — переказом на картку.</p>
-          <p>{PAYMENT_REQUISITES_STUB}</p>
+          {paymentStatus === 'loading' ? (
+            <Skeleton height={16} label={PAYMENT_LOADING_LABEL} />
+          ) : paymentStatus === 'error' ? (
+            <>
+              <p>{PAYMENT_FALLBACK_LABEL}</p>
+              <a href={SELLER_HREF} target="_blank" rel="noreferrer">
+                Написати продавцю
+              </a>
+            </>
+          ) : (
+            requisites !== null && <p>{requisites}</p>
+          )}
           <p>Доставку сплачує покупець.</p>
         </section>
         {serverMessages.length > 0 && (

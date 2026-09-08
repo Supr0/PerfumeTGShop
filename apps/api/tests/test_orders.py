@@ -63,7 +63,7 @@ ADMIN_ID = 999999999
 
 
 def _sign(fields: dict[str, str], bot_token: str = BOT_TOKEN) -> str:
-    data_check_string = "\n".join(f"{k}=<{v}>" for k, v in sorted(fields.items()))
+    data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(fields.items()))
     secret = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
     return hmac.new(secret, data_check_string.encode(), hashlib.sha256).hexdigest()
 

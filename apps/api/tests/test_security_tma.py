@@ -2,7 +2,7 @@
 
 Spec: validate_init_data(init_data: str, bot_token: str) -> dict
   - parses query-string initData
-  - rebuilds data_check_string as "\\n".join(sorted("k=<v>" for all fields except hash))
+  - rebuilds data_check_string as "\\n".join(sorted("k=v" for all fields except hash))
   - secret = HMAC_SHA256(key="WebAppData", msg=bot_token)
   - compares via hmac.compare_digest
   - rejects missing/future auth_date and age > 3600s (UTC)
@@ -13,6 +13,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import time
+from unittest.mock import patch
 from urllib.parse import urlencode
 
 import pytest
@@ -24,7 +25,7 @@ MAX_AGE = 3600
 
 
 def _sign(fields: dict[str, str], bot_token: str) -> str:
-    data_check_string = "\n".join(f"{k}=<{v}>" for k, v in sorted(fields.items()))
+    data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(fields.items()))
     secret = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
     return hmac.new(secret, data_check_string.encode(), hashlib.sha256).hexdigest()
 
@@ -97,3 +98,33 @@ def test_missing_hash_rejected() -> None:
 def test_empty_init_data_rejected() -> None:
     with pytest.raises(ValueError):
         validate_init_data("", BOT_TOKEN)
+
+
+# --- Independent spec-lock vector (C1) ---
+#
+# Generated OFFLINE with a scratch script using ONLY stdlib hmac/hashlib
+# (never importing app code), then pasted here as literals:
+#   fields = {"auth_date": "1788893900", "query_id": "AAESPECLOCK",
+#             "user": '{"id":918312403,"first_name":"Spec"}'}
+#   data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(fields))
+#   secret = HMAC_SHA256(key=b"WebAppData", msg=BOT_TOKEN)
+#   hash = HMAC_SHA256(key=secret, msg=data_check_string).hexdigest()
+# This locks the official Telegram spec (plain "k=v", NO angle brackets):
+# if the impl ever reintroduces "<v>", this vector fails even though the
+# self-consistent _sign helper above would still mirror the bug.
+# time.time is frozen so the literal auth_date never goes stale.
+
+_FROZEN_NOW = 1788894000
+_SPEC_LOCK_INIT_DATA = (
+    "auth_date=1788893900&query_id=AAESPECLOCK"
+    "&user=%7B%22id%22%3A918312403%2C%22first_name%22%3A%22Spec%22%7D"
+    "&hash=a64c946ada513d0afc5df179aa48a7075866f6bcaee05e45c4df31594d073368"
+)
+
+
+def test_independent_spec_vector_accepts_plain_k_eq_v() -> None:
+    with patch("time.time", return_value=_FROZEN_NOW):
+        result = validate_init_data(_SPEC_LOCK_INIT_DATA, BOT_TOKEN)
+    assert result["query_id"] == "AAESPECLOCK"
+    assert result["auth_date"] == "1788893900"
+    assert "hash" not in result
