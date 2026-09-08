@@ -86,7 +86,7 @@ describe('App hash routing', () => {
   it('should mount the cart page at #/cart', () => {
     window.location.hash = '#/cart';
     render(<App />);
-    expect(screen.getByText('Корзина')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Кошик' })).toBeInTheDocument();
   });
 
   it('should mount the orders page at #/orders', () => {
@@ -98,7 +98,7 @@ describe('App hash routing', () => {
   it('should mount the favorites page at #/favorites', () => {
     window.location.hash = '#/favorites';
     render(<App />);
-    expect(screen.getByRole('heading', { name: 'Избранное' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Обране' })).toBeInTheDocument();
   });
 
   it('should mount the product detail at #/product/:id', async () => {
@@ -112,7 +112,7 @@ describe('App hash routing', () => {
     expect(await screen.findByText('Aventus')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: 'Кошик' }));
     expect(window.location.hash).toBe('#/cart');
-    expect(screen.getByText('Корзина')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Кошик' })).toBeInTheDocument();
     // Non-admin: the admin tab stays hidden.
     expect(screen.queryByRole('tab', { name: 'Адмін' })).not.toBeInTheDocument();
   });

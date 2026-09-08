@@ -33,11 +33,11 @@ beforeEach(() => {
 
 afterEach(() => cleanup());
 
-describe('Cart page smoke', () => {
+describe('Cart page smoke (UK default)', () => {
   it('should render the empty state linking to hits', () => {
     render(<Cart />);
-    expect(screen.getByText('Корзина пуста')).toBeInTheDocument();
-    const link = screen.getByRole('link', { name: 'Смотреть хиты' });
+    expect(screen.getByText('Кошик порожній')).toBeInTheDocument();
+    const link = screen.getByRole('link', { name: 'Дивитися хіти' });
     expect(link).toHaveAttribute('href', '#/');
   });
 
@@ -48,16 +48,16 @@ describe('Cart page smoke', () => {
     ]);
     render(<Cart />);
     expect(screen.getByText('Test Parfum')).toBeInTheDocument();
-    expect(screen.getByText('Итого: 250 ₴')).toBeInTheDocument();
-    const checkout = screen.getByRole('link', { name: 'К оформлению' });
+    expect(screen.getByText('Разом: 250 ₴')).toBeInTheDocument();
+    const checkout = screen.getByRole('link', { name: 'До оформлення' });
     expect(checkout).toHaveAttribute('href', '#/checkout');
   });
 
   it('should remove a line when delete is pressed', () => {
     persistCart([{ productId: '1', variantId: 11, volume_ml: 3, qty: 1, price: 100, name: 'Test Parfum' }]);
     render(<Cart />);
-    fireEvent.click(screen.getByRole('button', { name: 'Удалить Test Parfum' }));
-    expect(screen.getByText('Корзина пуста')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Видалити Test Parfum' }));
+    expect(screen.getByText('Кошик порожній')).toBeInTheDocument();
   });
 
   it('should show a notice when switching to an out-of-stock volume', () => {
@@ -68,8 +68,8 @@ describe('Cart page smoke', () => {
         resolveVolumeStock={() => 0}
       />,
     );
-    fireEvent.change(screen.getByLabelText('Объём для Test Parfum'), { target: { value: '5' } });
-    expect(screen.getByRole('alert')).toHaveTextContent('Нет в наличии');
+    fireEvent.change(screen.getByLabelText('Обʼєм для Test Parfum'), { target: { value: '5' } });
+    expect(screen.getByRole('alert')).toHaveTextContent('Немає в наявності');
     expect(screen.getByText('Test Parfum')).toBeInTheDocument();
   });
 
@@ -82,7 +82,25 @@ describe('Cart page smoke', () => {
         resolveVariantId={(_productId, volumeMl) => (volumeMl === 5 ? 12 : 11)}
       />,
     );
-    fireEvent.change(screen.getByLabelText('Объём для Test Parfum'), { target: { value: '5' } });
-    expect(screen.getByLabelText('Объём для Test Parfum')).toHaveValue('5');
+    fireEvent.change(screen.getByLabelText('Обʼєм для Test Parfum'), { target: { value: '5' } });
+    expect(screen.getByLabelText('Обʼєм для Test Parfum')).toHaveValue('5');
+  });
+});
+
+describe('Cart page locale switch', () => {
+  it('should render RU strings when locale="ru"', () => {
+    render(<Cart locale="ru" />);
+    expect(screen.getByText('Корзина пуста')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Смотреть хиты' })).toBeInTheDocument();
+  });
+
+  it('should render RU line controls when locale="ru"', () => {
+    persistCart([
+      { productId: '1', variantId: 11, volume_ml: 3, qty: 2, price: 100, name: 'Test Parfum' },
+    ]);
+    render(<Cart locale="ru" />);
+    expect(screen.getByText('Итого: 200 ₴')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'К оформлению' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Удалить Test Parfum' })).toBeInTheDocument();
   });
 });

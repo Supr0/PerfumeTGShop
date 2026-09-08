@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { EmptyState } from '../components/feedback';
+import ukStrings from '../i18n/uk.json';
+import ruStrings from '../i18n/ru.json';
 import {
   MAX_QTY,
   cartTotal,
@@ -21,7 +23,13 @@ interface CartPageProps {
   resolveVolumeStock?: (productId: string, volumeMl: number) => number;
   /** Variant id lookup for a volume switch target (checkout FK). */
   resolveVariantId?: (productId: string, volumeMl: number) => number;
+  /** UI locale — mirrors the App shell switcher; defaults to UK. */
+  locale?: CartLocale;
 }
+
+export type CartLocale = 'uk' | 'ru';
+
+const CART_STRINGS: Record<CartLocale, Record<string, string>> = { uk: ukStrings, ru: ruStrings };
 
 /**
  * Cart page: lines with volume/qty controls, delete, display-only total,
@@ -32,7 +40,10 @@ export default function Cart({
   volumesByProduct = {},
   resolveVolumeStock = () => MAX_QTY,
   resolveVariantId = () => 0,
+  locale = 'uk',
 }: CartPageProps) {
+  const t = (key: string): string => CART_STRINGS[locale][key] ?? key;
+  const labelFor = (key: string, name: string): string => t(key).replace('{name}', name);
   const [lines, setLines] = useState<CartState>(() => loadCart());
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -42,9 +53,9 @@ export default function Cart({
 
   if (lines.length === 0) {
     return (
-      <section aria-label="Корзина">
-        <h1>Корзина</h1>
-        <EmptyState title="Корзина пуста" action={<a href="#/">Смотреть хиты</a>} />
+      <section className="fd-cart" aria-label={t('cart_title')}>
+        <h1>{t('cart_title')}</h1>
+        <EmptyState title={t('cart_empty')} action={<a href="#/">{t('cart_browse_hits')}</a>} />
       </section>
     );
   }
@@ -68,13 +79,13 @@ export default function Cart({
       setNotice(null);
       setLines(result.state);
     } else {
-      setNotice(result.reason === 'out_of_stock' ? 'Нет в наличии' : 'Товар не найден в корзине');
+      setNotice(result.reason === 'out_of_stock' ? t('cart_oos') : t('cart_not_in_cart'));
     }
   };
 
   return (
-    <section aria-label="Корзина">
-      <h1>Корзина</h1>
+    <section className="fd-cart" aria-label={t('cart_title')}>
+      <h1>{t('cart_title')}</h1>
       {notice && (
         <p role="alert">{notice}</p>
       )}
@@ -87,7 +98,7 @@ export default function Cart({
               <span>{line.volume_ml} ml</span>
               {volumes.length > 1 ? (
                 <select
-                  aria-label={`Объём для ${line.name ?? line.productId}`}
+                  aria-label={labelFor('cart_volume_label', line.name ?? line.productId)}
                   value={line.volume_ml}
                   onChange={(e) => changeVolume(line, Number(e.target.value))}
                 >
@@ -99,11 +110,11 @@ export default function Cart({
                 </select>
               ) : null}
               <div>
-                <button type="button" aria-label={`Уменьшить ${line.name ?? line.productId}`} onClick={() => changeQty(line, -1)}>
+                <button type="button" aria-label={labelFor('cart_decrease_label', line.name ?? line.productId)} onClick={() => changeQty(line, -1)}>
                   −
                 </button>
-                <span aria-label="Количество">{line.qty}</span>
-                <button type="button" aria-label={`Увеличить ${line.name ?? line.productId}`} onClick={() => changeQty(line, 1)}>
+                <span aria-label={t('cart_qty')}>{line.qty}</span>
+                <button type="button" aria-label={labelFor('cart_increase_label', line.name ?? line.productId)} onClick={() => changeQty(line, 1)}>
                   +
                 </button>
               </div>
@@ -112,19 +123,20 @@ export default function Cart({
               </span>
               <button
                 type="button"
-                aria-label={`Удалить ${line.name ?? line.productId}`}
+                className="fd-cart__remove"
+                aria-label={labelFor('cart_remove_label', line.name ?? line.productId)}
                 onClick={() => setLines((prev) => removeItem(prev, line.productId, line.volume_ml))}
               >
-                Удалить
+                {t('cart_remove')}
               </button>
             </li>
           );
         })}
       </ul>
       <p>
-        Итого: {cartTotal(lines)} ₴
+        {t('cart_total')}: {cartTotal(lines)} ₴
       </p>
-      <a href="#/checkout">К оформлению</a>
+      <a href="#/checkout">{t('cart_to_checkout')}</a>
     </section>
   );
 }

@@ -169,10 +169,10 @@ export default function App() {
         {route.name === 'product' && route.productId != null && (
           <ProductPage key={route.productId} productId={route.productId} />
         )}
-        {route.name === 'cart' && <Cart />}
+        {route.name === 'cart' && <Cart locale={locale} />}
         {route.name === 'checkout' && <Checkout />}
         {route.name === 'orders' && <Orders />}
-        {route.name === 'favorites' && <Favorites />}
+        {route.name === 'favorites' && <Favorites locale={locale} />}
         {route.name === 'admin' && <Admin />}
       </main>
       <TabBar

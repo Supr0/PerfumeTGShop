@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { EmptyState } from '../components/feedback';
+import ukStrings from '../i18n/uk.json';
+import ruStrings from '../i18n/ru.json';
 import { getOwnerId, getStorage } from '../lib/cart';
 
 const FAVORITES_PREFIX = 'freshdoze:favorites';
@@ -41,10 +43,17 @@ export function toggleFavorite(ids: string[], id: string): string[] {
 
 interface FavoritesPageProps {
   resolveName?: (id: string) => string;
+  /** UI locale — mirrors the App shell switcher; defaults to UK. */
+  locale?: FavoritesLocale;
 }
 
+export type FavoritesLocale = 'uk' | 'ru';
+
+const FAVORITES_STRINGS: Record<FavoritesLocale, Record<string, string>> = { uk: ukStrings, ru: ruStrings };
+
 /** Favorites page: hearts list from localStorage with an empty state. */
-export default function Favorites({ resolveName = (id) => id }: FavoritesPageProps) {
+export default function Favorites({ resolveName = (id) => id, locale = 'uk' }: FavoritesPageProps) {
+  const t = (key: string): string => FAVORITES_STRINGS[locale][key] ?? key;
   const [ids, setIds] = useState<string[]>(() => loadFavorites());
 
   useEffect(() => {
@@ -53,27 +62,27 @@ export default function Favorites({ resolveName = (id) => id }: FavoritesPagePro
 
   if (ids.length === 0) {
     return (
-      <section aria-label="Избранное">
-        <h1>Избранное</h1>
-        <EmptyState title="В избранном пока пусто" action={<a href="#/">Перейти к каталогу</a>} />
+      <section className="fd-favorites" aria-label={t('favorites_title')}>
+        <h1>{t('favorites_title')}</h1>
+        <EmptyState title={t('favorites_empty')} action={<a href="#/">{t('favorites_to_catalog')}</a>} />
       </section>
     );
   }
 
   return (
-    <section aria-label="Избранное">
-      <h1>Избранное</h1>
+    <section className="fd-favorites" aria-label={t('favorites_title')}>
+      <h1>{t('favorites_title')}</h1>
       <ul>
         {ids.map((id) => (
           <li key={id}>
-            <span aria-label="В избранном">♥</span>
+            <span aria-label={t('favorites_in_list')}>♥</span>
             <span>{resolveName(id)}</span>
             <button
               type="button"
-              aria-label={`Убрать ${resolveName(id)} из избранного`}
+              aria-label={t('favorites_remove_label').replace('{name}', resolveName(id))}
               onClick={() => setIds((prev) => toggleFavorite(prev, id))}
             >
-              Убрать
+              {t('favorites_remove')}
             </button>
           </li>
         ))}

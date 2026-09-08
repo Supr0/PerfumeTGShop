@@ -44,11 +44,11 @@ describe('favorites storage', () => {
   });
 });
 
-describe('Favorites page smoke', () => {
+describe('Favorites page smoke (UK default)', () => {
   it('should render the empty state', () => {
     render(<Favorites />);
-    expect(screen.getByText('В избранном пока пусто')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Перейти к каталогу' })).toHaveAttribute('href', '#/');
+    expect(screen.getByText('В обраному поки порожньо')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Перейти до каталогу' })).toHaveAttribute('href', '#/');
   });
 
   it('should list hearts stored in localStorage', () => {
@@ -61,7 +61,13 @@ describe('Favorites page smoke', () => {
   it('should unheart a product when remove is pressed', () => {
     persistFavorites(['p1']);
     render(<Favorites />);
-    fireEvent.click(screen.getByRole('button', { name: 'Убрать p1 из избранного' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Прибрати p1 з обраного' }));
+    expect(screen.getByText('В обраному поки порожньо')).toBeInTheDocument();
+  });
+
+  it('should render RU strings when locale="ru"', () => {
+    render(<Favorites locale="ru" />);
     expect(screen.getByText('В избранном пока пусто')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Перейти к каталогу' })).toBeInTheDocument();
   });
 });

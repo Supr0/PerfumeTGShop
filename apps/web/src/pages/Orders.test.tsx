@@ -52,7 +52,8 @@ describe('Orders page', () => {
     expect(await screen.findByText(/не вдалося|не удалось|failed/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /спробувати ще|повторити|retry|попробовать/i }));
     expect(await screen.findByText(/AB12CD34/)).toBeInTheDocument();
-    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    // Retry refetches the list plus the single catalog name lookup.
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
   });
 
   it('should send initData auth headers when fetching the list', async () => {
@@ -66,7 +67,7 @@ describe('Orders page', () => {
     expect((init.headers as Record<string, string>)['X-Telegram-Init-Data']).toContain('hash=abc');
   });
 
-  it('should fetch exactly once on the prod path (no fetchImpl prop)', async () => {
+  it('should fetch the list plus exactly one catalog lookup on the prod path (no fetchImpl prop)', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue({ ok: true, status: 200, json: async () => [] });
@@ -74,9 +75,38 @@ describe('Orders page', () => {
     try {
       render(<Orders />);
       await screen.findByText(/замовлень поки немає|заказов пока нет|no orders/i);
-      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      const urls = fetchMock.mock.calls.map(([url]) => String(url));
+      expect(urls[0]).toBe('/v1/orders/mine');
+      expect(urls[1].startsWith('/v1/catalog')).toBe(true);
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+
+  it('should resolve line names from one catalog fetch', async () => {
+    const catalogProduct = {
+      id: 7,
+      name: 'Aventus',
+      variants: [{ id: 11, volume_ml: 3, price_minor_uah: 39000, old_price_minor_uah: null, stock: 5 }],
+    };
+    const fetchImpl = vi.fn(async (input: string) => {
+      if (input.startsWith('/v1/catalog')) {
+        return { ok: true, status: 200, json: async () => ({ items: [catalogProduct], total: 1 }) };
+      }
+      return { ok: true, status: 200, json: async () => [ORDER] };
+    });
+    render(<Orders fetchImpl={fetchImpl} />);
+    expect(await screen.findByText('Aventus · 3 мл × 1 · 390 ₴')).toBeInTheDocument();
+    expect(fetchImpl.mock.calls.filter(([url]) => String(url).startsWith('/v1/catalog'))).toHaveLength(1);
+  });
+
+  it('should fall back to the variant label when the catalog fetch fails', async () => {
+    const fetchImpl = vi.fn(async (input: string) => {
+      if (input.startsWith('/v1/catalog')) throw new Error('catalog down');
+      return { ok: true, status: 200, json: async () => [ORDER] };
+    });
+    render(<Orders fetchImpl={fetchImpl} />);
+    expect(await screen.findByText('Варіант 11 × 1')).toBeInTheDocument();
   });
 });
