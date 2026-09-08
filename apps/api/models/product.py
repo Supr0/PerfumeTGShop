@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import CheckConstraint, ForeignKey, String, Text
+from sqlalchemy import JSON, CheckConstraint, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from apps.api.db.session import Base
@@ -20,6 +20,18 @@ class Product(Mapped, Base):
     brand: Mapped[str | None] = mapped_column(String(200), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
+    family: Mapped[str | None] = mapped_column(String(60), nullable=True, index=True)
+    gender: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    season: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    notes_top: Mapped[str | None] = mapped_column(Text, nullable=True)
+    notes_heart: Mapped[str | None] = mapped_column(Text, nullable=True)
+    notes_base: Mapped[str | None] = mapped_column(Text, nullable=True)
+    longevity: Mapped[int | None] = mapped_column(nullable=True)
+    sillage: Mapped[int | None] = mapped_column(nullable=True)
+    place_tags: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    image: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    is_hit: Mapped[bool] = mapped_column(default=False, nullable=False)
+    is_new: Mapped[bool] = mapped_column(default=False, nullable=False)
 
     variants: Mapped[list["ProductVariant"]] = relationship(
         back_populates="product", cascade="all, delete-orphan"

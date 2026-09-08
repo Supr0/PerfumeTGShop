@@ -26,4 +26,16 @@ class ProductOut(BaseModel):
     name: str
     brand: str | None = None
     description: str | None = None
+    family: str | None = None
+    gender: str | None = None
+    season: list[str] | None = None
+    notes_top: str | None = None
+    notes_heart: str | None = None
+    notes_base: str | None = None
+    longevity: int | None = None
+    sillage: int | None = None
+    place_tags: list[str] | None = None
+    image: str | None = None
+    is_hit: bool = False
+    is_new: bool = False
     variants: list[VariantOut] = []
