@@ -696,13 +696,20 @@ form button[type='submit'] {
   position: fixed;
   inset: 0;
   z-index: 50;
-  background: var(--sheet-backdrop);
   display: flex;
   align-items: flex-end;
   justify-content: center;
 }
 
+.fd-filter-sheet__backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--sheet-backdrop);
+  animation: fd-backdrop-in 250ms ease-out;
+}
+
 .fd-filter-sheet__body {
+  position: relative;
   background: var(--color-surface);
   border-radius: var(--radius-md) var(--radius-md) 0 0;
   width: 100%;
@@ -714,6 +721,22 @@ form button[type='submit'] {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  animation: fd-sheet-in 250ms ease-out;
+}
+
+.fd-filter-sheet--closing .fd-filter-sheet__backdrop {
+  animation: fd-backdrop-out 200ms ease-in forwards;
+}
+
+.fd-filter-sheet--closing .fd-filter-sheet__body {
+  animation: fd-sheet-out 200ms ease-in forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fd-filter-sheet__backdrop,
+  .fd-filter-sheet__body {
+    animation: none;
+  }
 }
 
 .fd-filter-group {

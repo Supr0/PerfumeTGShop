@@ -2,6 +2,7 @@
  * FilterSheet — bottom-sheet with catalog filters.
  * Controlled component: Home owns the FilterValue state.
  */
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 /** Sort keys match the server vocab (GET /v1/catalog ?sort=) verbatim. */
 export type SortKey = 'popular' | 'price_asc' | 'price_desc' | 'new';
@@ -27,6 +28,9 @@ export const DEFAULT_FILTERS: FilterValue = {
   in_stock_only: false,
   sort: 'popular',
 };
+
+/** Close-animation window in ms — mirrors the CSS slide-down/fade duration. */
+export const FILTER_SHEET_CLOSE_MS = 200;
 
 interface MultiCheckProps {
   title: string;
@@ -87,10 +91,78 @@ export function FilterSheet({
   onClose,
   onReset,
 }: FilterSheetProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // Closing plays the slide-down/fade animation BEFORE the owner unmounts:
+  // requestClose flips the closing class, then calls onClose after
+  // FILTER_SHEET_CLOSE_MS.
+  const [closing, setClosing] = useState(false);
+  const closingRef = useRef(false);
+  const closeTimerRef = useRef<number | undefined>(undefined);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  const requestClose = useCallback(() => {
+    if (closingRef.current) return;
+    const reducedMotion =
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reducedMotion) {
+      onCloseRef.current();
+      return;
+    }
+    closingRef.current = true;
+    setClosing(true);
+    closeTimerRef.current = window.setTimeout(() => {
+      onCloseRef.current();
+    }, FILTER_SHEET_CLOSE_MS);
+  }, []);
+
+  useEffect(() => {
+    // Drop the pending close when the owner unmounts first.
+    return () => {
+      if (closeTimerRef.current !== undefined) {
+        window.clearTimeout(closeTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    // Focus bookkeeping: focus the first control on open,
+    // return focus to the invoker on unmount/close.
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const dialog = dialogRef.current;
+    const firstControl = dialog?.querySelector<HTMLElement>(
+      'input:not([disabled]), select:not([disabled]), button:not([disabled])',
+    );
+    (firstControl ?? dialog)?.focus();
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') requestClose();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      previouslyFocused?.focus();
+    };
+  }, [open, requestClose]);
+
   if (!open) return null;
 
   return (
-    <div className="fd-filter-sheet" role="dialog" aria-modal="true" aria-label="Фільтри">
+    <div
+      ref={dialogRef}
+      className={closing ? 'fd-filter-sheet fd-filter-sheet--closing' : 'fd-filter-sheet'}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Фільтри"
+      tabIndex={-1}
+    >
+      <div
+        className="fd-filter-sheet__backdrop"
+        data-testid="filter-sheet-backdrop"
+        onClick={requestClose}
+      />
       <div className="fd-filter-sheet__body">
         <MultiCheck
           title="Бренд"
@@ -164,7 +236,7 @@ export function FilterSheet({
           <button type="button" onClick={onReset}>
             Скинути
           </button>
-          <button type="button" onClick={onClose}>
+          <button type="button" onClick={requestClose}>
             Показати
           </button>
         </div>
