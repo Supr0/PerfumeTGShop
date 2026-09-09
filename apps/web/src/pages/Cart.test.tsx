@@ -87,6 +87,88 @@ describe('Cart page smoke (UK default)', () => {
   });
 });
 
+describe('Cart volume switch (already_in_cart + OOS filter)', () => {
+  it('should hide out-of-stock volumes except the current line volume', () => {
+    persistCart([{ productId: '1', variantId: 11, volume_ml: 3, qty: 1, price: 100, name: 'Test Parfum' }]);
+    render(
+      <Cart
+        volumesByProduct={{ 1: [3, 5] }}
+        resolveVolumeStock={(_productId, volumeMl) => (volumeMl === 3 ? 4 : 0)}
+      />,
+    );
+    expect(screen.getByRole('option', { name: '3 ml' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: '5 ml' })).not.toBeInTheDocument();
+  });
+
+  it('should always keep the current line volume even when it is out of stock', () => {
+    persistCart([{ productId: '1', variantId: 12, volume_ml: 5, qty: 1, price: 100, name: 'Test Parfum' }]);
+    render(
+      <Cart
+        volumesByProduct={{ 1: [3, 5] }}
+        resolveVolumeStock={() => 0}
+      />,
+    );
+    expect(screen.getByRole('option', { name: '5 ml' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: '3 ml' })).not.toBeInTheDocument();
+  });
+
+  it('should show the already-in-cart notice and clear it on qty change', () => {    persistCart([
+      { productId: '1', variantId: 11, volume_ml: 3, qty: 1, price: 100, name: 'Alpha' },
+      { productId: '1', variantId: 12, volume_ml: 5, qty: 1, price: 120, name: 'Beta' },
+    ]);
+    render(
+      <Cart
+        volumesByProduct={{ 1: [3, 5] }}
+        resolveVolumeStock={() => 4}
+        resolveVariantId={(_productId, volumeMl) => (volumeMl === 5 ? 12 : 11)}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText('Обʼєм для Alpha'), { target: { value: '5' } });
+    expect(screen.getByRole('alert')).toHaveTextContent('Такий обʼєм уже в кошику');
+    expect(screen.getByText('Alpha')).toBeInTheDocument();
+    expect(screen.getByText('Beta')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Збільшити Alpha' }));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('should clear the notice when a line is deleted', () => {
+    persistCart([
+      { productId: '1', variantId: 11, volume_ml: 3, qty: 1, price: 100, name: 'Alpha' },
+      { productId: '1', variantId: 12, volume_ml: 5, qty: 1, price: 120, name: 'Beta' },
+    ]);
+    render(
+      <Cart
+        volumesByProduct={{ 1: [3, 5] }}
+        resolveVolumeStock={() => 4}
+        resolveVariantId={(_productId, volumeMl) => (volumeMl === 5 ? 12 : 11)}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText('Обʼєм для Alpha'), { target: { value: '5' } });
+    expect(screen.getByRole('alert')).toHaveTextContent('Такий обʼєм уже в кошику');
+    fireEvent.click(screen.getByRole('button', { name: 'Видалити Alpha' }));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByText('Alpha')).not.toBeInTheDocument();
+    expect(screen.getByText('Beta')).toBeInTheDocument();
+  });
+
+  it('should render the RU already-in-cart string when locale="ru"', () => {
+    persistCart([
+      { productId: '1', variantId: 11, volume_ml: 3, qty: 1, price: 100, name: 'Alpha' },
+      { productId: '1', variantId: 12, volume_ml: 5, qty: 1, price: 120, name: 'Beta' },
+    ]);
+    render(
+      <Cart
+        locale="ru"
+        volumesByProduct={{ 1: [3, 5] }}
+        resolveVolumeStock={() => 4}
+        resolveVariantId={(_productId, volumeMl) => (volumeMl === 5 ? 12 : 11)}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText('Объём для Alpha'), { target: { value: '5' } });
+    expect(screen.getByRole('alert')).toHaveTextContent('Такой объём уже в корзине');
+  });
+});
+
 describe('Cart page locale switch', () => {
   it('should render RU strings when locale="ru"', () => {
     render(<Cart locale="ru" />);

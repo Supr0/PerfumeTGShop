@@ -26,4 +26,30 @@ describe('VolumeSelector', () => {
     expect(oos).toHaveAttribute('aria-disabled', 'true');
     expect(screen.getByText(/немає в наявності|нет в наличии|out of stock/i)).toBeInTheDocument();
   });
+
+  it('should render OOS options by default (hideOutOfStock unset or false)', () => {
+    const { rerender } = render(<VolumeSelector variants={variants} value={3} onChange={() => {}} />);
+    expect(screen.getByRole('radio', { name: /5\s?ml/i })).toBeInTheDocument();
+    rerender(<VolumeSelector variants={variants} value={3} onChange={() => {}} hideOutOfStock={false} />);
+    expect(screen.getByRole('radio', { name: /5\s?ml/i })).toBeInTheDocument();
+  });
+
+  it('should hide OOS options except current when hideOutOfStock', () => {
+    render(<VolumeSelector variants={variants} value={3} onChange={() => {}} hideOutOfStock />);
+    expect(screen.getByRole('radio', { name: /3\s?ml/i })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /10\s?ml/i })).toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: /5\s?ml/i })).not.toBeInTheDocument();
+  });
+
+  it('should keep current OOS option visible but disabled when hideOutOfStock', () => {
+    const onChange = vi.fn();
+    render(<VolumeSelector variants={variants} value={5} onChange={onChange} hideOutOfStock />);
+    const current = screen.getByRole('radio', { name: /5\s?ml/i });
+    expect(current).toBeDisabled();
+    expect(current).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByText(/немає в наявності|нет в наличии|out of stock/i)).toBeInTheDocument();
+    // price stays coherent with the current OOS selection
+    expect(screen.getByText(/590/)).toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
+  });
 });

@@ -149,12 +149,21 @@ describe('switchVolume', () => {
     expect(res.state[0]).toMatchObject({ volume_ml: 5, variantId: 12, qty: 3 });
   });
 
-  it('should merge into the target line when it already exists, capped by stock', () => {
+  it('should reject the switch when the target volume is already a different line', () => {
     const base = [item({ volume_ml: 3, variantId: 11, qty: 3 }), item({ volume_ml: 5, variantId: 12, qty: 4 })];
+    const res = switchVolume(base, '1', 3, 5, 10, 12);
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.reason).toBe('already_in_cart');
+    expect(res.state).toEqual(base);
+    expect(res.state).toHaveLength(2);
+  });
+
+  it('should preserve qty and clamp silently to target stock on switch', () => {
+    const base = [item({ volume_ml: 3, variantId: 11, qty: 8 })];
     const res = switchVolume(base, '1', 3, 5, 5, 12);
     expect(res.ok).toBe(true);
     expect(res.state).toHaveLength(1);
-    expect(res.state[0].qty).toBe(5);
+    expect(res.state[0]).toMatchObject({ volume_ml: 5, variantId: 12, qty: 5 });
   });
 
   it('should reject the switch when the target volume is out of stock', () => {

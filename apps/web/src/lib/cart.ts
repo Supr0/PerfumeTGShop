@@ -34,7 +34,7 @@ export type CartState = CartItem[];
 
 export type SwitchVolumeResult =
   | { ok: true; state: CartState }
-  | { ok: false; reason: 'out_of_stock' | 'line_not_found'; state: CartState };
+  | { ok: false; reason: 'out_of_stock' | 'line_not_found' | 'already_in_cart'; state: CartState };
 
 /** Identity of a cart line: product + volume_ml (volumes are separate lines). */
 export function cartItemKey(productId: string | number, volume_ml: number): string {
@@ -165,8 +165,10 @@ export function removeItem(state: CartState, productId: string, volume_ml: numbe
 }
 
 /**
- * Move a line to another volume, preserving qty. Rejects with a reason
- * (state unchanged) when the target is out of stock or the source is missing.
+ * Move a line to another volume, preserving qty (silently clamped to
+ * target stock). Rejects with a reason (state unchanged) when the target
+ * is out of stock, the source is missing, or the target volume is already
+ * a different line (variant A — no silent merge, the UI notices).
  */
 export function switchVolume(
   state: CartState,
@@ -181,15 +183,17 @@ export function switchVolume(
   if (!source) return { ok: false, reason: 'line_not_found', state };
   if (targetStock <= 0) return { ok: false, reason: 'out_of_stock', state };
   const toKey = cartItemKey(productId, toVolumeMl);
+  if (toKey !== fromKey && state.some((line) => cartItemKey(line.productId, line.volume_ml) === toKey)) {
+    return { ok: false, reason: 'already_in_cart', state };
+  }
   const rest = state.filter(
     (line) => cartItemKey(line.productId, line.volume_ml) !== fromKey && cartItemKey(line.productId, line.volume_ml) !== toKey,
   );
-  const target = state.find((line) => cartItemKey(line.productId, line.volume_ml) === toKey);
-  const qty = clampQty(target ? target.qty + source.qty : source.qty, targetStock);
+  const qty = clampQty(source.qty, targetStock);
   const merged: CartItem = {
-    ...(target ?? source),
+    ...source,
     productId,
-    variantId: target?.variantId ?? targetVariantId,
+    variantId: targetVariantId,
     volume_ml: toVolumeMl,
     qty,
   };

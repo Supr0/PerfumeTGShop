@@ -114,11 +114,16 @@ describe('Home (wired to the real catalog API)', () => {
     });
   });
 
-  it('should add the first in-stock variant to the cart store with a toast', async () => {
+  it('should open the volume sheet on add and complete the deferred onAdd contract', async () => {
     const onAddToCart = vi.fn();
     render(<Home fetchImpl={vi.fn().mockResolvedValue(catalogResponse())} onAddToCart={onAddToCart} />);
     const addButtons = await screen.findAllByRole('button', { name: /додати/i });
+    // Step 1: click opens the volume sheet (owned by ProductCard/VolumeSheet).
     fireEvent.click(addButtons[0]);
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    // Step 2: picking a volume resolves the documented onAdd (productId, variantId).
+    const options = await screen.findAllByRole('radio');
+    fireEvent.click(options[0]);
     expect(onAddToCart).toHaveBeenCalledWith(1, 11);
     expect(loadCart()).toEqual([
       expect.objectContaining({ productId: '1', variantId: 11, volume_ml: 3, qty: 1 }),

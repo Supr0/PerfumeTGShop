@@ -40,19 +40,48 @@ describe('ProductCard', () => {
     expect(screen.getByText(/-13%/)).toBeInTheDocument();
   });
 
-  it('should call onAdd with first in-stock variant id', () => {
+  it('should open volume sheet instead of calling onAdd directly', () => {
     const onAdd = vi.fn();
     render(<ProductCard product={product} onAdd={onAdd} />);
     fireEvent.click(screen.getByRole('button', { name: /додати|добавить|add/i }));
-    expect(onAdd).toHaveBeenCalledWith(1, 11);
+    expect(onAdd).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
-  it('should toggle favorite via heart button', () => {
-    const onToggleFavorite = vi.fn();
+  it('should call onAdd with picked variant id and close the sheet', () => {
+    const onAdd = vi.fn();
+    render(<ProductCard product={product} onAdd={onAdd} />);
+    fireEvent.click(screen.getByRole('button', { name: /додати|добавить|add/i }));
+    fireEvent.click(screen.getByRole('radio', { name: /10\s?ml/i }));
+    expect(onAdd).toHaveBeenCalledWith(1, 13);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('should keep add disabled and never open sheet when all variants are OOS', () => {
+    const onAdd = vi.fn();
+    const oosProduct: Product = {
+      ...product,
+      variants: product.variants.map((v) => ({ ...v, stock: 0 })),
+    };
+    render(<ProductCard product={oosProduct} onAdd={onAdd} />);
+    const add = screen.getByRole('button', { name: /додати|добавить|add/i });
+    expect(add).toBeDisabled();
+    fireEvent.click(add);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(onAdd).not.toHaveBeenCalled();
+  });
+
+  it('should toggle favorite via heart button', () => {    const onToggleFavorite = vi.fn();
     render(<ProductCard product={product} isFavorite={false} onToggleFavorite={onToggleFavorite} />);
     const heart = screen.getByRole('button', { name: /обране|избранное|favorite/i });
     expect(heart).toHaveAttribute('aria-pressed', 'false');
     fireEvent.click(heart);
     expect(onToggleFavorite).toHaveBeenCalledWith(1);
+  });
+
+  it('should pass locale="ru" through to the volume sheet close button', () => {
+    render(<ProductCard product={product} locale="ru" />);
+    fireEvent.click(screen.getByRole('button', { name: /додати|добавить|add/i }));
+    expect(screen.getByRole('button', { name: 'Закрыть' })).toBeInTheDocument();
   });
 });

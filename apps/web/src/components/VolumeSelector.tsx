@@ -8,16 +8,20 @@ interface VolumeSelectorProps {
   value: number;
   onChange: (volumeMl: number) => void;
   currency?: string;
+  hideOutOfStock?: boolean;
 }
 
-export function VolumeSelector({ variants, value, onChange, currency = '₴' }: VolumeSelectorProps) {
+export function VolumeSelector({ variants, value, onChange, currency = '₴', hideOutOfStock = false }: VolumeSelectorProps) {
   const ordered = [...variants].sort((a, b) => a.volume_ml - b.volume_ml);
   const selected = ordered.find((v) => v.volume_ml === value) ?? ordered[0];
+  // hideOutOfStock hides OOS options, but the current value always stays
+  // rendered (disabled + selected when OOS) so price/group stay coherent.
+  const visible = hideOutOfStock ? ordered.filter((v) => !isOutOfStock(v) || v.volume_ml === value) : ordered;
 
   return (
     <div className="fd-volume-selector">
       <div className="fd-volume-selector__options" role="radiogroup" aria-label="Обʼєм">
-        {ordered.map((v) => {
+        {visible.map((v) => {
           const oos = isOutOfStock(v);
           return (
             <button

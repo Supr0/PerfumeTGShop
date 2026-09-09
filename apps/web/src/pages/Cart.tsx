@@ -67,20 +67,31 @@ export default function Cart({
 
   const changeVolume = (item: CartItem, nextVolumeMl: number) => {
     if (nextVolumeMl === item.volume_ml) return;
-    const result = switchVolume(
-      lines,
-      item.productId,
-      item.volume_ml,
-      nextVolumeMl,
-      resolveVolumeStock(item.productId, nextVolumeMl),
-      resolveVariantId(item.productId, nextVolumeMl),
-    );
-    if (result.ok) {
-      setNotice(null);
-      setLines(result.state);
-    } else {
-      setNotice(result.reason === 'out_of_stock' ? t('cart_oos') : t('cart_not_in_cart'));
-    }
+    const targetStock = resolveVolumeStock(item.productId, nextVolumeMl);
+    const targetVariantId = resolveVariantId(item.productId, nextVolumeMl);
+    setLines((prev) => {
+      const result = switchVolume(
+        prev,
+        item.productId,
+        item.volume_ml,
+        nextVolumeMl,
+        targetStock,
+        targetVariantId,
+      );
+      if (result.ok) {
+        setNotice(null);
+      } else if (result.reason === 'already_in_cart') {
+        setNotice(t('cart_already_in_cart'));
+      } else {
+        setNotice(result.reason === 'out_of_stock' ? t('cart_oos') : t('cart_not_in_cart'));
+      }
+      return result.state;
+    });
+  };
+
+  const removeLine = (item: CartItem) => {
+    setNotice(null);
+    setLines((prev) => removeItem(prev, item.productId, item.volume_ml));
   };
 
   return (
@@ -91,12 +102,17 @@ export default function Cart({
       )}
       <ul>
         {lines.map((line) => {
-          const volumes = volumesByProduct[line.productId] ?? [line.volume_ml];
+          const allVolumes = volumesByProduct[line.productId] ?? [line.volume_ml];
+          // Out-of-stock volumes are hidden, but the current line volume
+          // always stays (mirrors the VolumeSelector hideOutOfStock contract).
+          const volumes = allVolumes.filter(
+            (v) => v === line.volume_ml || resolveVolumeStock(line.productId, v) > 0,
+          );
           return (
             <li key={`${line.productId}::${line.volume_ml}`}>
               <span>{line.name ?? line.productId}</span>
               <span>{line.volume_ml} ml</span>
-              {volumes.length > 1 ? (
+              {allVolumes.length > 1 ? (
                 <select
                   aria-label={labelFor('cart_volume_label', line.name ?? line.productId)}
                   value={line.volume_ml}
@@ -125,7 +141,7 @@ export default function Cart({
                 type="button"
                 className="fd-cart__remove"
                 aria-label={labelFor('cart_remove_label', line.name ?? line.productId)}
-                onClick={() => setLines((prev) => removeItem(prev, line.productId, line.volume_ml))}
+                onClick={() => removeLine(line)}
               >
                 {t('cart_remove')}
               </button>

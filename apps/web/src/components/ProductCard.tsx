@@ -8,6 +8,9 @@
  * fields (family, gender, season, longevity, sillage, place_tags).
  */
 
+import { useState } from 'react';
+import { VolumeSheet } from './VolumeSheet';
+
 export interface VariantOut {
   id: number;
   volume_ml: number;
@@ -74,7 +77,11 @@ interface ProductCardProps {
   isFavorite?: boolean;
   onAdd?: AddToCartHandler;
   onToggleFavorite?: (productId: number) => void;
+  /** UI locale — passed through to the volume sheet; defaults to UK. */
+  locale?: ProductCardLocale;
 }
+
+export type ProductCardLocale = 'uk' | 'ru';
 
 export function ProductCard({
   product,
@@ -82,13 +89,20 @@ export function ProductCard({
   isFavorite = false,
   onAdd,
   onToggleFavorite,
+  locale = 'uk',
 }: ProductCardProps) {
   const volumes = [...product.variants].sort((a, b) => a.volume_ml - b.volume_ml);
   const firstInStock = volumes.find((v) => !isOutOfStock(v)) ?? null;
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   const handleAdd = () => {
     if (!firstInStock) return;
-    onAdd?.(product.id, firstInStock.id);
+    setSheetOpen(true);
+  };
+
+  const handlePick = (productId: number, variantId: number) => {
+    onAdd?.(productId, variantId);
+    setSheetOpen(false);
   };
 
   return (
@@ -135,6 +149,15 @@ export function ProductCard({
           {isFavorite ? '♥' : '♡'}
         </button>
       </div>
+      {sheetOpen && firstInStock && (
+        <VolumeSheet
+          product={product}
+          currency={currency}
+          locale={locale}
+          onPick={handlePick}
+          onClose={() => setSheetOpen(false)}
+        />
+      )}
     </article>
   );
 }
