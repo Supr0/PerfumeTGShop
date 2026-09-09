@@ -52,4 +52,22 @@ describe('VolumeSelector', () => {
     expect(screen.getByText(/590/)).toBeInTheDocument();
     expect(onChange).not.toHaveBeenCalled();
   });
+
+  it('should leave every option unchecked and hide the selected price when value is null', () => {
+    const onChange = vi.fn();
+    render(<VolumeSelector variants={variants} value={null} onChange={onChange} />);
+    const radios = screen.getAllByRole('radio');
+    expect(radios.length).toBeGreaterThan(0);
+    radios.forEach((radio) => expect(radio).toHaveAttribute('aria-checked', 'false'));
+    expect(screen.queryByText(/390/)).not.toBeInTheDocument();
+    // tap still reports the tapped volume
+    fireEvent.click(screen.getByRole('radio', { name: /10\s?ml/i }));
+    expect(onChange).toHaveBeenCalledWith(10);
+  });
+
+  it('should show each option price on its row when showOptionPrices', () => {
+    render(<VolumeSelector variants={variants} value={null} onChange={() => {}} showOptionPrices />);
+    expect(screen.getByRole('radio', { name: /3\s?ml\s?—\s?390/ })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /10\s?ml\s?—\s?990/ })).toBeInTheDocument();
+  });
 });
