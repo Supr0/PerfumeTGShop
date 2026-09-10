@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ProductCard } from './ProductCard';
 import type { Product } from './ProductCard';
@@ -83,5 +83,45 @@ describe('ProductCard', () => {
     render(<ProductCard product={product} locale="ru" />);
     fireEvent.click(screen.getByRole('button', { name: /додати|добавить|add/i }));
     expect(screen.getByRole('button', { name: 'Закрыть' })).toBeInTheDocument();
+  });
+});
+
+describe('ProductCard navigation', () => {
+  beforeEach(() => {
+    window.location.hash = '#/';
+  });
+
+  it('should navigate to the product page when the title is clicked', () => {
+    render(<ProductCard product={product} />);
+    fireEvent.click(screen.getByText('Aventus'));
+    expect(window.location.hash).toBe('#/product/1');
+  });
+
+  it('should navigate to the product page when the image is clicked', () => {
+    render(<ProductCard product={product} />);
+    fireEvent.click(screen.getByRole('img', { name: 'Aventus' }));
+    expect(window.location.hash).toBe('#/product/1');
+  });
+
+  it('should not navigate when + or heart buttons are clicked', () => {
+    const onAdd = vi.fn();
+    const onToggleFavorite = vi.fn();
+    render(<ProductCard product={product} onAdd={onAdd} onToggleFavorite={onToggleFavorite} />);
+    window.location.hash = '#/';
+    fireEvent.click(screen.getByRole('button', { name: /обране|избранное|favorite/i }));
+    expect(onToggleFavorite).toHaveBeenCalledWith(1);
+    expect(window.location.hash).toBe('#/');
+    fireEvent.click(screen.getByRole('button', { name: /додати|добавить|add/i }));
+    expect(window.location.hash).toBe('#/');
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('should open the product page on Enter when the card nav region is focused', () => {
+    render(<ProductCard product={product} />);
+    window.location.hash = '#/';
+    const nav = screen.getByRole('link', { name: 'Aventus' });
+    expect(nav).toHaveAttribute('tabindex', '0');
+    fireEvent.keyDown(nav, { key: 'Enter' });
+    expect(window.location.hash).toBe('#/product/1');
   });
 });

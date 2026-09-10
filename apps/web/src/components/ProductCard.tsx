@@ -100,9 +100,26 @@ export function ProductCard({
   const t = (key: string): string => CARD_STRINGS[locale][key] ?? key;
   const OOS_LABEL = t('out_of_stock');
 
-  const handleAdd = () => {
+  const handleAdd = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (!firstInStock) return;
     setSheetOpen(true);
+  };
+
+  const handleToggleFavorite = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onToggleFavorite?.(product.id);
+  };
+
+  const goToProduct = () => {
+    window.location.hash = `#/product/${product.id}`;
+  };
+
+  const handleNavKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      goToProduct();
+    }
   };
 
   const handlePick = (productId: number, variantId: number) => {
@@ -112,7 +129,19 @@ export function ProductCard({
 
   return (
     <article className="fd-product-card" aria-label={product.name}>
-      <div className="fd-product-card__image" role="img" aria-label={product.name} />
+      <div
+        className="fd-product-card__nav"
+        onClick={goToProduct}
+        onKeyDown={handleNavKeyDown}
+        tabIndex={0}
+        role="link"
+        aria-label={product.name}
+        style={{ cursor: 'pointer' }}
+      >
+        <div className="fd-product-card__image" role="img" aria-label={product.name} />
+        {product.brand && <p className="fd-product-card__brand">{product.brand}</p>}
+        <h3 className="fd-product-card__name">{product.name}</h3>
+      </div>
       <div className="fd-product-card__badges">
         {product.is_hit && <span className="fd-badge fd-badge--hit">HIT</span>}
         {volumes.map((v) => {
@@ -124,8 +153,6 @@ export function ProductCard({
           ) : null;
         })}
       </div>
-      {product.brand && <p className="fd-product-card__brand">{product.brand}</p>}
-      <h3 className="fd-product-card__name">{product.name}</h3>
       <ul className="fd-product-card__prices">
         {volumes.map((v) => (
           <li key={v.id} className="fd-product-card__price-row">
@@ -149,7 +176,7 @@ export function ProductCard({
           type="button"
           aria-pressed={isFavorite}
           aria-label={t('fav_aria').replace('{name}', product.name)}
-          onClick={() => onToggleFavorite?.(product.id)}
+          onClick={handleToggleFavorite}
         >
           {isFavorite ? '♥' : '♡'}
         </button>
