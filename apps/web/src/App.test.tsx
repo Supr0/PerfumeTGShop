@@ -117,3 +117,125 @@ describe('App hash routing', () => {
     expect(screen.queryByRole('tab', { name: 'Адмін' })).not.toBeInTheDocument();
   });
 });
+
+describe('App swipe tab navigation', () => {
+  beforeEach(() => {
+    window.location.hash = '#/';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        const url = String(input);
+        if (url.includes('/v1/admin/me'))
+          return { ok: false, status: 403, json: async () => ({ detail: 'forbidden' }) };
+        if (url.startsWith('/v1/products/'))
+          return { ok: true, status: 200, json: async () => ROUTE_PRODUCT };
+        if (url.includes('/v1/catalog'))
+          return { ok: true, status: 200, json: async () => ({ items: [ROUTE_PRODUCT], total: 1 }) };
+        return { ok: false, status: 404, json: async () => ({ detail: 'not found' }) };
+      }),
+    );
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+    window.location.hash = '#/';
+  });
+
+  function swipe(el: Element, sx: number, sy: number, ex: number, ey: number) {
+    fireEvent.touchStart(el, { touches: [{ clientX: sx, clientY: sy }] });
+    fireEvent.touchEnd(el, { changedTouches: [{ clientX: ex, clientY: ey }] });
+  }
+
+  function mainEl(): Element {
+    const el = document.querySelector('.fd-main');
+    if (!el) throw new Error('main (.fd-main) not found');
+    return el;
+  }
+
+  it('should navigate to the next tab on swipe left', async () => {
+    render(<App />);
+    expect(await screen.findByText('Aventus')).toBeInTheDocument();
+    swipe(mainEl(), 200, 200, 100, 200);
+    expect(window.location.hash).toBe('#/cart');
+  });
+
+  it('should navigate to the previous tab on swipe right', () => {
+    window.location.hash = '#/cart';
+    render(<App />);
+    swipe(mainEl(), 100, 200, 200, 205);
+    expect(window.location.hash).toBe('#/');
+  });
+
+  it('should ignore swipes below the horizontal threshold', async () => {
+    render(<App />);
+    expect(await screen.findByText('Aventus')).toBeInTheDocument();
+    swipe(mainEl(), 200, 200, 170, 200);
+    expect(window.location.hash).toBe('#/');
+  });
+
+  it('should ignore vertical scrolls', async () => {
+    render(<App />);
+    expect(await screen.findByText('Aventus')).toBeInTheDocument();
+    swipe(mainEl(), 200, 200, 100, 320);
+    expect(window.location.hash).toBe('#/');
+  });
+
+  it('should ignore multi-touch gestures', async () => {
+    render(<App />);
+    expect(await screen.findByText('Aventus')).toBeInTheDocument();
+    const main = mainEl();
+    fireEvent.touchStart(main, {
+      touches: [
+        { clientX: 200, clientY: 200 },
+        { clientX: 210, clientY: 200 },
+      ],
+    });
+    fireEvent.touchEnd(main, { changedTouches: [{ clientX: 50, clientY: 200 }] });
+    expect(window.location.hash).toBe('#/');
+  });
+
+  it('should ignore swipes while a dialog/sheet is open', async () => {
+    const { FilterSheet, DEFAULT_FILTERS } = await import('./components/FilterSheet');
+    render(
+      <>
+        <App />
+        <FilterSheet
+          open
+          brands={[]}
+          families={[]}
+          genders={[]}
+          seasons={[]}
+          value={DEFAULT_FILTERS}
+          onChange={() => {}}
+          onClose={() => {}}
+          onReset={() => {}}
+        />
+      </>,
+    );
+    expect(await screen.findByText('Aventus')).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    swipe(mainEl(), 200, 200, 100, 200);
+    expect(window.location.hash).toBe('#/');
+  });
+
+  it('should ignore swipes starting on an input', async () => {
+    render(<App />);
+    const searchbox = await screen.findByRole('searchbox');
+    swipe(searchbox, 200, 200, 100, 200);
+    expect(window.location.hash).toBe('#/');
+  });
+
+  it('should clamp at the ends without wrapping', () => {
+    window.location.hash = '#/';
+    const { unmount } = render(<App />);
+    swipe(mainEl(), 100, 200, 220, 200);
+    expect(window.location.hash).toBe('#/');
+    unmount();
+    cleanup();
+    window.location.hash = '#/favorites';
+    render(<App />);
+    swipe(mainEl(), 200, 200, 80, 200);
+    expect(window.location.hash).toBe('#/favorites');
+  });
+});

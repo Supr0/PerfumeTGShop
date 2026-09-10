@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { authHeaders, initTma } from './lib/tma';
 import uk from './i18n/uk.json';
 import ru from './i18n/ru.json';
@@ -15,6 +15,10 @@ type Tab = 'catalog' | 'cart' | 'orders' | 'favorites' | 'admin';
 
 const LOCALE_KEY = 'freshdoze:locale';
 const TABS: Tab[] = ['catalog', 'cart', 'orders', 'favorites'];
+// Swipe navigation thresholds: |dx| >= SWIPE_MIN_DX with |dy| < SWIPE_MAX_DY.
+// Ends are clamped (no wrap-around) — a swipe past the first/last tab is ignored.
+const SWIPE_MIN_DX = 70;
+const SWIPE_MAX_DY = 50;
 const ADMIN_ME_URL = '/v1/admin/me';
 const STRINGS: Record<Locale, Record<string, string>> = { uk, ru };
 
@@ -130,6 +134,12 @@ function readRoute(): Route {
   }
 }
 
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+  return target.closest('input,textarea,select,datalist,[contenteditable]') != null;
+}
+
 export default function App() {
   const [locale, setLocale] = useState<Locale>(loadLocale);
   const [route, setRoute] = useState<Route>(readRoute);
@@ -158,13 +168,71 @@ export default function App() {
   const visibleTabs: Tab[] = isAdmin ? [...TABS, 'admin'] : TABS;
   const tab = routeToTab(route);
 
+  const goToTab = (next: Tab) => {
+    window.location.hash = tabToHash(next);
+    setRoute(parseHash(tabToHash(next)));
+  };
+
+  // Touch-end-driven swipe detection on the main content only (never
+  // preventDefault, so scrolling is unaffected). Single touch only.
+  const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLElement>) => {
+    if (e.touches.length !== 1) {
+      swipeStartRef.current = null;
+      return;
+    }
+    // Any open dialog/sheet wins — never hijack its gestures.
+    if (typeof document !== 'undefined' && document.querySelector('[role="dialog"]')) {
+      swipeStartRef.current = null;
+      return;
+    }
+    if (isEditableTarget(e.target)) {
+      swipeStartRef.current = null;
+      return;
+    }
+    const touch = e.touches[0];
+    swipeStartRef.current = { x: touch.clientX, y: touch.clientY };
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent<HTMLElement>) => {
+    const start = swipeStartRef.current;
+    swipeStartRef.current = null;
+    if (!start) return;
+    if (typeof document !== 'undefined' && document.querySelector('[role="dialog"]')) return;
+    if (e.changedTouches.length !== 1) return;
+    const touch = e.changedTouches[0];
+    if (!touch) return;
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    if (Math.abs(dy) >= SWIPE_MAX_DY) return;
+    if (Math.abs(dx) < SWIPE_MIN_DX) return;
+    // Admin and other non-main routes stay tap-only.
+    const index = TABS.indexOf(tab);
+    if (index === -1) return;
+    if (dx < 0) {
+      if (index >= TABS.length - 1) return;
+      goToTab(TABS[index + 1]);
+    } else {
+      if (index <= 0) return;
+      goToTab(TABS[index - 1]);
+    }
+  };
+
   return (
     <div className="fd-app">
       <header className="fd-header">
         <span className="fd-logo">FreshDoze</span>
         <LocaleSwitcher locale={locale} onChange={setLocale} />
       </header>
-      <main className="fd-main">
+      <main
+        className="fd-main"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={() => {
+          swipeStartRef.current = null;
+        }}
+      >
         {route.name === 'catalog' && <Home locale={locale} />}
         {route.name === 'product' && route.productId != null && (
           <ProductPage key={route.productId} productId={route.productId} locale={locale} />
@@ -178,10 +246,7 @@ export default function App() {
       <TabBar
         tabs={visibleTabs}
         tab={tab}
-        onChange={(next) => {
-          window.location.hash = tabToHash(next);
-          setRoute(parseHash(tabToHash(next)));
-        }}
+        onChange={goToTab}
         t={t}
       />
     </div>
