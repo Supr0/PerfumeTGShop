@@ -113,6 +113,7 @@ export function VolumeSheet({ product, currency = '₴', onPick, onClose, locale
           currency={currency}
           hideOutOfStock
           showOptionPrices
+          locale={locale}
         />
         <button type="button" onClick={requestClose}>
           {t('sheet_close')}

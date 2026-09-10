@@ -13,11 +13,17 @@ import { authHeaders } from '../lib/tma';
 import { parseOutOfStockVolumes, type OutOfStockVolume } from '../lib/api';
 import { cartTotal, loadCart, persistCart, type CartState } from '../lib/cart';
 import { Skeleton } from '../components/feedback';
+import ukStrings from '../i18n/uk.json';
+import ruStrings from '../i18n/ru.json';
+
+export type CheckoutLocale = 'uk' | 'ru';
+
+const CHECKOUT_STRINGS: Record<CheckoutLocale, Record<string, string>> = { uk: ukStrings, ru: ruStrings };
 
 export const CHECKOUT_URL = '/v1/orders';
 export const PUBLIC_SETTINGS_URL = '/v1/settings/public';
-export const PAYMENT_LOADING_LABEL = 'Завантаження реквізитів…';
-export const PAYMENT_FALLBACK_LABEL = 'Реквізити уточнить менеджер';
+export const PAYMENT_LOADING_LABEL: string = ukStrings['payment_loading'] ?? 'payment_loading';
+export const PAYMENT_FALLBACK_LABEL: string = ukStrings['payment_fallback'] ?? 'payment_fallback';
 export const SELLER_HREF = 'https://t.me/freshdoze_catalog_bot';
 
 export const NAME_MAX = 80;
@@ -25,7 +31,7 @@ export const CITY_MAX = 120;
 export const BRANCH_MAX = 120;
 export const COMMENT_MAX = 500;
 
-export const PHONE_ERROR = 'Введіть номер у форматі +380…';
+export const PHONE_ERROR: string = ukStrings['err_phone'] ?? 'err_phone';
 
 /** Wave: NP directory API — replace with the live directory, keep free-text fallback. */
 export const CITIES = ['Львів', 'Київ', 'Одеса', 'Дніпро', 'Харків'];
@@ -104,20 +110,20 @@ export function buildCheckoutBody(
 
 type FieldErrors = Partial<Record<'name' | 'phone' | 'city' | 'branch' | 'comment', string>>;
 
-function validateForm(form: CheckoutForm): FieldErrors {
+function validateForm(form: CheckoutForm, t: (key: string) => string): FieldErrors {
   const errors: FieldErrors = {};
   const name = form.name.trim();
-  if (name === '') errors.name = "Введіть ім'я";
-  else if (name.length > NAME_MAX) errors.name = `Ім'я має бути до ${NAME_MAX} символів`;
-  if (!isValidPhoneNumber(normalizePhoneNumber(form.phone))) errors.phone = PHONE_ERROR;
+  if (name === '') errors.name = t('err_name_required');
+  else if (name.length > NAME_MAX) errors.name = t('err_name_max').replace('{max}', String(NAME_MAX));
+  if (!isValidPhoneNumber(normalizePhoneNumber(form.phone))) errors.phone = t('err_phone');
   const city = form.city.trim();
-  if (city === '') errors.city = 'Введіть місто';
-  else if (city.length > CITY_MAX) errors.city = `Місто має бути до ${CITY_MAX} символів`;
+  if (city === '') errors.city = t('err_city_required');
+  else if (city.length > CITY_MAX) errors.city = t('err_city_max').replace('{max}', String(CITY_MAX));
   const branch = form.branch.trim();
-  if (branch === '') errors.branch = 'Введіть відділення';
-  else if (branch.length > BRANCH_MAX) errors.branch = `Відділення має бути до ${BRANCH_MAX} символів`;
+  if (branch === '') errors.branch = t('err_branch_required');
+  else if (branch.length > BRANCH_MAX) errors.branch = t('err_branch_max').replace('{max}', String(BRANCH_MAX));
   if (form.comment.trim().length > COMMENT_MAX)
-    errors.comment = `Коментар має бути до ${COMMENT_MAX} символів`;
+    errors.comment = t('err_comment_max').replace('{max}', String(COMMENT_MAX));
   return errors;
 }
 
@@ -145,6 +151,8 @@ interface CheckoutProps {
   settingsUrl?: string;
   /** Test seam — defaults to the real cart store. */
   initialItems?: CartState;
+  /** UI locale — mirrors the App shell switcher; defaults to UK. */
+  locale?: CheckoutLocale;
 }
 
 export default function Checkout({
@@ -152,9 +160,11 @@ export default function Checkout({
   checkoutUrl = CHECKOUT_URL,
   settingsUrl = PUBLIC_SETTINGS_URL,
   initialItems,
+  locale = 'uk',
 }: CheckoutProps) {
+  const t = (key: string): string => CHECKOUT_STRINGS[locale][key] ?? key;
   const [items] = useState<CartState>(() => initialItems ?? loadCart());
-  const [form, setForm] = useState<CheckoutForm>({ name: '', phone: '', city: 'Львів', branch: '', comment: '' });
+  const [form, setForm] = useState<CheckoutForm>({ name: '', phone: '', city: t('default_city'), branch: '', comment: '' });
   const [errors, setErrors] = useState<FieldErrors>({});
   const [pending, setPending] = useState(false);
   const [orderNumber, setOrderNumber] = useState<string | null>(null);
@@ -199,20 +209,20 @@ export default function Checkout({
 
   if (orderNumber !== null) {
     return (
-      <section aria-label="Замовлення оформлено">
-        <h1>{`Дякуємо! Замовлення №${orderNumber}`}</h1>
-        <p>Ми напишемо вам для підтвердження оплати.</p>
-        <a href="#/orders">Мої замовлення</a>
+      <section className="fd-checkout fd-checkout--done" aria-label={t('checkout_done_section')}>
+        <h1>{t('checkout_done_title').replace('{number}', orderNumber)}</h1>
+        <p>{t('checkout_done_hint')}</p>
+        <a href="#/orders">{t('checkout_done_orders')}</a>
       </section>
     );
   }
 
   if (items.length === 0) {
     return (
-      <section aria-label="Оформлення замовлення">
-        <h1>Оформлення замовлення</h1>
-        <p>Кошик порожній</p>
-        <a href="#/">До каталогу</a>
+      <section className="fd-checkout" aria-label={t('checkout_title')}>
+        <h1>{t('checkout_title')}</h1>
+        <p>{t('checkout_empty')}</p>
+        <a href="#/">{t('checkout_to_catalog')}</a>
       </section>
     );
   }
@@ -220,7 +230,7 @@ export default function Checkout({
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (pending) return;
-    const nextErrors = validateForm(form);
+    const nextErrors = validateForm(form, t);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
     setPending(true);
@@ -254,7 +264,7 @@ export default function Checkout({
         // Real server shape: {detail:"out_of_stock", volumes:[{variant_id, ml, stock}]}.
         const volumes = parseOutOfStockVolumes(payload);
         setOutOfStockVolumes(volumes);
-        setSubmitError('Немає в наявності');
+        setSubmitError(t('out_of_stock'));
         setOutOfStock(true);
         return;
       }
@@ -265,39 +275,39 @@ export default function Checkout({
           return;
         }
       }
-      setSubmitError('Не вдалося оформити замовлення. Спробуйте ще.');
+      setSubmitError(t('checkout_failed'));
     } catch {
-      setSubmitError('Не вдалося оформити замовлення. Спробуйте ще.');
+      setSubmitError(t('checkout_failed'));
     } finally {
       setPending(false);
     }
   };
 
   return (
-    <section aria-label="Оформлення замовлення">
-      <h1>Оформлення замовлення</h1>
+    <section className="fd-checkout" aria-label={t('checkout_title')}>
+      <h1>{t('checkout_title')}</h1>
       <p>
-        {`Разом до сплати (орієнтовно): ${cartTotal(items)} ₴`}
+        {t('checkout_total').replace('{total}', String(cartTotal(items)))}
       </p>
       <form onSubmit={submit} noValidate>
         <div>
-          <label htmlFor="fd-name">{"Ім'я"}</label>
+          <label htmlFor="fd-name">{t('field_name')}</label>
           <input id="fd-name" value={form.name} onChange={set('name')} maxLength={NAME_MAX} />
           {errors.name && <p role="alert">{errors.name}</p>}
         </div>
         <div>
-          <label htmlFor="fd-phone">Телефон</label>
+          <label htmlFor="fd-phone">{t('field_phone')}</label>
           <input
             id="fd-phone"
             inputMode="tel"
-            placeholder="+380…"
+            placeholder={t('phone_placeholder')}
             value={form.phone}
             onChange={set('phone')}
           />
           {errors.phone && <p role="alert">{errors.phone}</p>}
         </div>
         <div>
-          <label htmlFor="fd-city">Місто</label>
+          <label htmlFor="fd-city">{t('field_city')}</label>
           <input id="fd-city" list="fd-checkout-cities" value={form.city} onChange={set('city')} maxLength={CITY_MAX} />
           <datalist id="fd-checkout-cities">
             {CITIES.map((c) => (
@@ -307,7 +317,7 @@ export default function Checkout({
           {errors.city && <p role="alert">{errors.city}</p>}
         </div>
         <div>
-          <label htmlFor="fd-branch">Відділення (Нова пошта)</label>
+          <label htmlFor="fd-branch">{t('field_branch')}</label>
           <input
             id="fd-branch"
             list="fd-checkout-branches"
@@ -323,26 +333,26 @@ export default function Checkout({
           {errors.branch && <p role="alert">{errors.branch}</p>}
         </div>
         <div>
-          <label htmlFor="fd-comment">Коментар (необов’язково)</label>
+          <label htmlFor="fd-comment">{t('field_comment')}</label>
           <textarea id="fd-comment" value={form.comment} onChange={set('comment')} maxLength={COMMENT_MAX + 50} />
           {errors.comment && <p role="alert">{errors.comment}</p>}
         </div>
-        <section aria-label="Оплата">
-          <h2>Оплата</h2>
-          <p>Оплата — переказом на картку.</p>
+        <section className="fd-checkout__payment" aria-label={t('payment_title')}>
+          <h2>{t('payment_title')}</h2>
+          <p>{t('payment_card')}</p>
           {paymentStatus === 'loading' ? (
-            <Skeleton height={16} label={PAYMENT_LOADING_LABEL} />
+            <Skeleton height={16} label={t('payment_loading')} locale={locale} />
           ) : paymentStatus === 'error' ? (
             <>
-              <p>{PAYMENT_FALLBACK_LABEL}</p>
+              <p>{t('payment_fallback')}</p>
               <a href={SELLER_HREF} target="_blank" rel="noreferrer">
-                Написати продавцю
+                {t('seller_chat')}
               </a>
             </>
           ) : (
             requisites !== null && <p>{requisites}</p>
           )}
-          <p>Доставку сплачує покупець.</p>
+          <p>{t('payment_delivery')}</p>
         </section>
         {serverMessages.length > 0 && (
           <div role="alert">
@@ -353,17 +363,19 @@ export default function Checkout({
         )}
         {submitError && <p role="alert">{submitError}</p>}
         {outOfStock && outOfStockVolumes.length > 0 && (
-          <ul aria-label="Наявність за обʼємами">
+          <ul aria-label={t('oos_volumes_label')}>
             {outOfStockVolumes.map((v) => (
               <li key={v.variant_id}>
-                {v.stock <= 0 ? `${v.ml} мл — немає в наявності` : `${v.ml} мл — залишилося ${v.stock} шт.`}
+                {v.stock <= 0
+                  ? t('oos_row_none').replace('{ml}', String(v.ml))
+                  : t('oos_row_left').replace('{ml}', String(v.ml)).replace('{stock}', String(v.stock))}
               </li>
             ))}
           </ul>
         )}
-        {outOfStock && <a href="#/cart">Повернутися до кошика</a>}
+        {outOfStock && <a href="#/cart">{t('checkout_back_to_cart')}</a>}
         <button type="submit" disabled={pending}>
-          Підтвердити замовлення
+          {t('checkout_submit')}
         </button>
       </form>
     </section>

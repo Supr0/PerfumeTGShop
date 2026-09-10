@@ -3,6 +3,8 @@
  * Controlled component: Home owns the FilterValue state.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import ukStrings from '../i18n/uk.json';
+import ruStrings from '../i18n/ru.json';
 
 /** Sort keys match the server vocab (GET /v1/catalog ?sort=) verbatim. */
 export type SortKey = 'popular' | 'price_asc' | 'price_desc' | 'new';
@@ -68,7 +70,13 @@ interface FilterSheetProps {
   onChange: (next: FilterValue) => void;
   onClose: () => void;
   onReset: () => void;
+  /** UI locale — mirrors the App shell switcher; defaults to UK. */
+  locale?: FilterSheetLocale;
 }
+
+export type FilterSheetLocale = 'uk' | 'ru';
+
+const FILTER_STRINGS: Record<FilterSheetLocale, Record<string, string>> = { uk: ukStrings, ru: ruStrings };
 
 function toggleInList(list: string[], item: string): string[] {
   return list.includes(item) ? list.filter((x) => x !== item) : [...list, item];
@@ -90,7 +98,9 @@ export function FilterSheet({
   onChange,
   onClose,
   onReset,
+  locale = 'uk',
 }: FilterSheetProps) {
+  const t = (key: string): string => FILTER_STRINGS[locale][key] ?? key;
   const dialogRef = useRef<HTMLDivElement>(null);
   // Closing plays the slide-down/fade animation BEFORE the owner unmounts:
   // requestClose flips the closing class, then calls onClose after
@@ -167,7 +177,7 @@ export function FilterSheet({
       className={closing ? 'fd-filter-sheet fd-filter-sheet--closing' : 'fd-filter-sheet'}
       role="dialog"
       aria-modal="true"
-      aria-label="Фільтри"
+      aria-label={t('filter_title')}
       tabIndex={-1}
     >
       <div
@@ -177,27 +187,27 @@ export function FilterSheet({
       />
       <div className="fd-filter-sheet__body">
         <MultiCheck
-          title="Бренд"
+          title={t('filter_brand')}
           options={brands}
           selected={value.brands}
           onToggle={(opt) => onChange({ ...value, brands: toggleInList(value.brands, opt) })}
         />
         <MultiCheck
-          title="Сімейство"
+          title={t('filter_family')}
           options={families}
           selected={value.families}
           onToggle={(opt) => onChange({ ...value, families: toggleInList(value.families, opt) })}
         />
         <MultiCheck
-          title="Стать"
+          title={t('filter_gender')}
           options={genders}
           selected={value.genders}
           onToggle={(opt) => onChange({ ...value, genders: toggleInList(value.genders, opt) })}
         />
         <fieldset className="fd-filter-group">
-          <legend>Ціна</legend>
+          <legend>{t('filter_price')}</legend>
           <label className="fd-filter-option" htmlFor="fd-price-min">
-            Ціна від
+            {t('filter_price_from')}
           </label>
           <input
             id="fd-price-min"
@@ -207,7 +217,7 @@ export function FilterSheet({
             onChange={(e) => onChange({ ...value, price_min: toNullableNumber(e.target.value) })}
           />
           <label className="fd-filter-option" htmlFor="fd-price-max">
-            Ціна до
+            {t('filter_price_to')}
           </label>
           <input
             id="fd-price-max"
@@ -218,7 +228,7 @@ export function FilterSheet({
           />
         </fieldset>
         <MultiCheck
-          title="Сезон"
+          title={t('filter_season')}
           options={seasons}
           selected={value.seasons}
           onToggle={(opt) => onChange({ ...value, seasons: toggleInList(value.seasons, opt) })}
@@ -229,27 +239,27 @@ export function FilterSheet({
             checked={value.in_stock_only}
             onChange={(e) => onChange({ ...value, in_stock_only: e.target.checked })}
           />
-          В наявності
+          {t('filter_in_stock')}
         </label>
         <label className="fd-filter-option" htmlFor="fd-sort">
-          Сортування
+          {t('filter_sort')}
         </label>
         <select
           id="fd-sort"
           value={value.sort}
           onChange={(e) => onChange({ ...value, sort: e.target.value as SortKey })}
         >
-          <option value="popular">За популярністю</option>
-          <option value="price_asc">Дешевші спочатку</option>
-          <option value="price_desc">Дорожчі спочатку</option>
-          <option value="new">Новинки</option>
+          <option value="popular">{t('sort_popular')}</option>
+          <option value="price_asc">{t('sort_price_asc')}</option>
+          <option value="price_desc">{t('sort_price_desc')}</option>
+          <option value="new">{t('sort_new')}</option>
         </select>
         <div className="fd-filter-sheet__footer">
           <button type="button" onClick={onReset}>
-            Скинути
+            {t('filter_reset')}
           </button>
           <button type="button" onClick={requestClose}>
-            Показати
+            {t('filter_show')}
           </button>
         </div>
       </div>

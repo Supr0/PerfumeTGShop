@@ -10,6 +10,8 @@
 
 import { useState } from 'react';
 import { VolumeSheet } from './VolumeSheet';
+import ukStrings from '../i18n/uk.json';
+import ruStrings from '../i18n/ru.json';
 
 export interface VariantOut {
   id: number;
@@ -42,7 +44,8 @@ export interface AddToCartHandler {
 }
 
 const DEFAULT_CURRENCY = '₴';
-const OOS_LABEL = 'Немає в наявності';
+
+const CARD_STRINGS: Record<ProductCardLocale, Record<string, string>> = { uk: ukStrings, ru: ruStrings };
 
 /** Minor units (kopiyky) → whole major units, e.g. 39000 → "390". */
 export function formatPriceMinor(priceMinorUah: number): string {
@@ -94,6 +97,8 @@ export function ProductCard({
   const volumes = [...product.variants].sort((a, b) => a.volume_ml - b.volume_ml);
   const firstInStock = volumes.find((v) => !isOutOfStock(v)) ?? null;
   const [sheetOpen, setSheetOpen] = useState(false);
+  const t = (key: string): string => CARD_STRINGS[locale][key] ?? key;
+  const OOS_LABEL = t('out_of_stock');
 
   const handleAdd = () => {
     if (!firstInStock) return;
@@ -136,14 +141,14 @@ export function ProductCard({
           type="button"
           onClick={handleAdd}
           disabled={firstInStock == null}
-          aria-label={`Додати ${product.name}`}
+          aria-label={t('add_aria').replace('{name}', product.name)}
         >
-          Додати +
+          {t('add_label')}
         </button>
         <button
           type="button"
           aria-pressed={isFavorite}
-          aria-label={`Обране: ${product.name}`}
+          aria-label={t('fav_aria').replace('{name}', product.name)}
           onClick={() => onToggleFavorite?.(product.id)}
         >
           {isFavorite ? '♥' : '♡'}

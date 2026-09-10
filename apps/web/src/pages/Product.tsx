@@ -12,11 +12,14 @@ import { fetchCatalog, fetchProduct, type FetchFn } from '../lib/api';
 import { VolumeSelector } from '../components/VolumeSelector';
 import { isOutOfStock } from '../components/ProductCard';
 import type { Product, AddToCartHandler } from '../components/ProductCard';
-import { ADDED_TO_CART_LABEL, Skeleton, Toast } from '../components/feedback';
+import { Skeleton, Toast } from '../components/feedback';
+import ukStrings from '../i18n/uk.json';
+import ruStrings from '../i18n/ru.json';
 
-const LOAD_ERROR_LABEL = 'Не вдалося завантажити товар.';
-const RETRY_LABEL = 'Спробувати ще';
-const SIMILAR_EMPTY_LABEL = 'Поки немає схожих товарів.';
+export type ProductPageLocale = 'uk' | 'ru';
+
+const PRODUCT_STRINGS: Record<ProductPageLocale, Record<string, string>> = { uk: ukStrings, ru: ruStrings };
+
 const SIMILAR_LIMIT = 8;
 
 /**
@@ -31,15 +34,16 @@ export function toNoteItems(value: string | string[] | null | undefined): string
 }
 
 /** Characteristics table built from real ProductOut fields — no fixture-only object. */
-export function characteristicsOf(product: Product): Array<[string, string]> {
+export function characteristicsOf(product: Product, locale: ProductPageLocale = 'uk'): Array<[string, string]> {
+  const t = (key: string): string => PRODUCT_STRINGS[locale][key] ?? key;
   const rows: Array<[string, string]> = [];
-  if (product.family) rows.push(['Сімейство', product.family]);
-  if (product.gender) rows.push(['Стать', product.gender]);
-  if (product.season && product.season.length > 0) rows.push(['Сезон', product.season.join(', ')]);
-  if (product.longevity != null) rows.push(['Стійкість', String(product.longevity)]);
-  if (product.sillage != null) rows.push(['Шлейф', String(product.sillage)]);
+  if (product.family) rows.push([t('char_family'), product.family]);
+  if (product.gender) rows.push([t('char_gender'), product.gender]);
+  if (product.season && product.season.length > 0) rows.push([t('char_season'), product.season.join(', ')]);
+  if (product.longevity != null) rows.push([t('char_longevity'), String(product.longevity)]);
+  if (product.sillage != null) rows.push([t('char_sillage'), String(product.sillage)]);
   if (product.place_tags && product.place_tags.length > 0)
-    rows.push(['Нагоди', product.place_tags.join(', ')]);
+    rows.push([t('char_occasions'), product.place_tags.join(', ')]);
   return rows;
 }
 
@@ -56,9 +60,12 @@ interface ProductPageProps {
   onAddToCart?: AddToCartHandler;
   /** Test seam — defaults to the global fetch. */
   fetchImpl?: FetchFn;
+  /** UI locale — mirrors the App shell switcher; defaults to UK. */
+  locale?: ProductPageLocale;
 }
 
-export function ProductPage({ productId, product: productProp, loading = false, onAddToCart, fetchImpl }: ProductPageProps) {
+export function ProductPage({ productId, product: productProp, loading = false, onAddToCart, fetchImpl, locale = 'uk' }: ProductPageProps) {
+  const t = (key: string): string => PRODUCT_STRINGS[locale][key] ?? key;
   const [volume, setVolume] = useState<number | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [fetched, setFetched] = useState<Product | null>(null);
@@ -130,19 +137,19 @@ export function ProductPage({ productId, product: productProp, loading = false, 
   if (loading || product == null) {
     if (detailStatus === 'error' && productId != null) {
       return (
-        <section className="fd-product" aria-label="Товар">
-          <p role="alert">{LOAD_ERROR_LABEL}</p>
+        <section className="fd-product" aria-label={t('product_section')}>
+          <p role="alert">{t('product_load_error')}</p>
           <button type="button" onClick={() => setAttempt((n) => n + 1)}>
-            {RETRY_LABEL}
+            {t('retry')}
           </button>
         </section>
       );
     }
     return (
-      <section className="fd-product" aria-label="Товар">
-        <Skeleton height={240} label="Завантаження товару…" />
-        <Skeleton height={24} />
-        <Skeleton height={16} />
+      <section className="fd-product" aria-label={t('product_section')}>
+        <Skeleton height={240} label={t('product_loading')} locale={locale} />
+        <Skeleton height={24} locale={locale} />
+        <Skeleton height={16} locale={locale} />
       </section>
     );
   }
@@ -154,35 +161,35 @@ export function ProductPage({ productId, product: productProp, loading = false, 
   const handleAdd = () => {
     if (!activeVariant || isOutOfStock(activeVariant)) return;
     onAddToCart?.(product.id, activeVariant.id);
-    setToast(ADDED_TO_CART_LABEL);
+    setToast(t('added_to_cart'));
   };
 
   const notes = [
-    { title: 'Верхні ноти', items: toNoteItems(product.notes_top) },
-    { title: 'Ноти серця', items: toNoteItems(product.notes_heart) },
-    { title: 'База', items: toNoteItems(product.notes_base) },
+    { title: t('notes_top'), items: toNoteItems(product.notes_top) },
+    { title: t('notes_heart'), items: toNoteItems(product.notes_heart) },
+    { title: t('notes_base'), items: toNoteItems(product.notes_base) },
   ].filter((g): g is { title: string; items: string[] } => g.items != null && g.items.length > 0);
 
-  const characteristics = characteristicsOf(product);
+  const characteristics = characteristicsOf(product, locale);
 
   return (
     <section className="fd-product" aria-label={product.name}>
       <div className="fd-product__gallery" role="img" aria-label={product.name} />
       {product.brand && <p className="fd-product__brand">{product.brand}</p>}
       <h1 className="fd-product__name">{product.name}</h1>
-      <VolumeSelector variants={product.variants} value={activeVolume} onChange={setVolume} />
+      <VolumeSelector variants={product.variants} value={activeVolume} onChange={setVolume} locale={locale} />
       <button
         type="button"
         onClick={handleAdd}
         disabled={activeVariant == null || isOutOfStock(activeVariant)}
-        aria-label={`Додати ${product.name}`}
+        aria-label={t('add_aria').replace('{name}', product.name)}
       >
-        Додати +
+        {t('add_label')}
       </button>
       {product.description && <p className="fd-product__description">{product.description}</p>}
       {notes.length > 0 && (
-        <section aria-label="Піраміда аромату">
-          <h2>Піраміда аромату</h2>
+        <section className="fd-product__notes" aria-label={t('notes_pyramid')}>
+          <h2>{t('notes_pyramid')}</h2>
           {notes.map((g) => (
             <div key={g.title}>
               <h3>{g.title}</h3>
@@ -196,8 +203,8 @@ export function ProductPage({ productId, product: productProp, loading = false, 
         </section>
       )}
       {characteristics.length > 0 && (
-        <section aria-label="Характеристики">
-          <h2>Характеристики</h2>
+        <section aria-label={t('specs_title')}>
+          <h2>{t('specs_title')}</h2>
           <table>
             <tbody>
               {characteristics.map(([k, v]) => (
@@ -210,10 +217,10 @@ export function ProductPage({ productId, product: productProp, loading = false, 
           </table>
         </section>
       )}
-      <section aria-label="Схожі товари">
-        <h2>Схожі товари</h2>
+      <section className="fd-product__similar" aria-label={t('similar_title')}>
+        <h2>{t('similar_title')}</h2>
         {similar.length === 0 ? (
-          <p role="status">{SIMILAR_EMPTY_LABEL}</p>
+          <p role="status">{t('similar_empty')}</p>
         ) : (
           <ul>
             {similar.map((s) => (

@@ -1,7 +1,7 @@
 /**
  * Admin page: Products / Orders / Settings, gated by GET /v1/admin/me.
  *
- * A non-200 gate renders "Немає доступу" and fetches nothing else.
+ * A non-200 gate renders the localized "denied" heading and fetches nothing else.
  * All mutations mirror server validation (volumes 3/5/10, username list
  * ^[A-Za-z0-9_]{5,32}$ max 20) and toast on save.
  */
@@ -9,6 +9,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { Skeleton, Toast } from '../components/feedback';
 import { authHeaders } from '../lib/tma';
 import type { FetchImpl } from './Checkout';
+import ukStrings from '../i18n/uk.json';
+import ruStrings from '../i18n/ru.json';
+
+export type AdminLocale = 'uk' | 'ru';
+
+const ADMIN_STRINGS: Record<AdminLocale, Record<string, string>> = { uk: ukStrings, ru: ruStrings };
 
 export const ADMIN_ME_URL = '/v1/admin/me';
 export const ADMIN_PRODUCTS_URL = '/v1/admin/products';
@@ -16,8 +22,8 @@ export const ADMIN_ORDERS_URL = '/v1/admin/orders';
 export const ADMIN_SETTINGS_URL = '/v1/admin/settings';
 export const ADMIN_PROMOS_URL = '/v1/admin/promos';
 
-export const ADMIN_DENIED_LABEL = 'Немає доступу';
-export const ADMIN_SAVED_LABEL = 'Збережено';
+export const ADMIN_DENIED_LABEL: string = ukStrings['admin_denied'] ?? 'admin_denied';
+export const ADMIN_SAVED_LABEL: string = ukStrings['admin_saved'] ?? 'admin_saved';
 
 type Gate = 'checking' | 'denied' | 'allowed';
 type Section = 'products' | 'orders' | 'settings';
@@ -65,6 +71,8 @@ interface AdminProps {
   ordersUrl?: string;
   settingsUrl?: string;
   promosUrl?: string;
+  /** UI locale — mirrors the App shell switcher; defaults to UK. */
+  locale?: AdminLocale;
 }
 
 const defaultFetch: FetchImpl = (input, init) => fetch(input, init);
@@ -82,12 +90,15 @@ function OrderRow({
   ordersUrl,
   fetcher,
   onSaved,
+  locale = 'uk',
 }: {
   order: AdminOrder;
   ordersUrl: string;
   fetcher: FetchImpl;
   onSaved: (message: string) => void;
+  locale?: AdminLocale;
 }) {
+  const t = (key: string): string => ADMIN_STRINGS[locale][key] ?? key;
   const [status, setStatus] = useState(order.status);
   const [ttn, setTtn] = useState(order.ttn ?? '');
   const [saving, setSaving] = useState(false);
@@ -102,7 +113,7 @@ function OrderRow({
         // that could wipe a stored TTN.
         body: JSON.stringify({ status, ttn: ttn.trim() === '' ? null : ttn }),
       });
-      if (res.ok) onSaved(ADMIN_SAVED_LABEL);
+      if (res.ok) onSaved(t('admin_saved'));
     } finally {
       setSaving(false);
     }
@@ -112,7 +123,7 @@ function OrderRow({
     <tr>
       <td>{order.number}</td>
       <td>
-        <select aria-label={`Статус ${order.number}`} value={status} onChange={(e) => setStatus(e.target.value)}>
+        <select aria-label={t('admin_status_label').replace('{number}', order.number)} value={status} onChange={(e) => setStatus(e.target.value)}>
           {ORDER_STATUSES.map((s) => (
             <option key={s} value={s}>
               {s}
@@ -121,11 +132,11 @@ function OrderRow({
         </select>
       </td>
       <td>
-        <input aria-label={`ТТН ${order.number}`} value={ttn} onChange={(e) => setTtn(e.target.value)} />
+        <input aria-label={t('admin_ttn_label').replace('{number}', order.number)} value={ttn} onChange={(e) => setTtn(e.target.value)} />
       </td>
       <td>
         <button type="button" disabled={saving} onClick={() => void save()}>
-          Зберегти
+          {t('admin_save')}
         </button>
       </td>
     </tr>
@@ -136,11 +147,14 @@ function ProductForm({
   productsUrl,
   fetcher,
   onSaved,
+  locale = 'uk',
 }: {
   productsUrl: string;
   fetcher: FetchImpl;
   onSaved: (message: string) => void;
+  locale?: AdminLocale;
 }) {
+  const t = (key: string): string => ADMIN_STRINGS[locale][key] ?? key;
   const [name, setName] = useState('');
   const [brand, setBrand] = useState('');
   const [price, setPrice] = useState('');
@@ -172,7 +186,7 @@ function ProductForm({
       }),
     });
     if (res.ok) {
-      onSaved(ADMIN_SAVED_LABEL);
+      onSaved(t('admin_saved'));
       setName('');
       setBrand('');
       setPrice('');
@@ -184,25 +198,25 @@ function ProductForm({
   };
 
   return (
-    <form aria-label="Новий товар" onSubmit={(e) => void create(e)}>
-      <input aria-label="Назва" value={name} onChange={(e) => setName(e.target.value)} maxLength={200} />
-      <input aria-label="Бренд" value={brand} onChange={(e) => setBrand(e.target.value)} maxLength={200} />
-      <input aria-label="Ціна (коп.)" value={price} onChange={(e) => setPrice(e.target.value)} inputMode="numeric" />
-      <input aria-label="Стара ціна (коп.)" value={oldPrice} onChange={(e) => setOldPrice(e.target.value)} inputMode="numeric" />
-      <input aria-label="Залишок" value={stock} onChange={(e) => setStock(e.target.value)} inputMode="numeric" />
-      <select aria-label="Обʼєм" value={volume} onChange={(e) => setVolume(e.target.value)}>
+    <form aria-label={t('admin_new_product')} onSubmit={(e) => void create(e)}>
+      <input aria-label={t('admin_f_name')} value={name} onChange={(e) => setName(e.target.value)} maxLength={200} />
+      <input aria-label={t('admin_f_brand')} value={brand} onChange={(e) => setBrand(e.target.value)} maxLength={200} />
+      <input aria-label={t('admin_f_price')} value={price} onChange={(e) => setPrice(e.target.value)} inputMode="numeric" />
+      <input aria-label={t('admin_f_old_price')} value={oldPrice} onChange={(e) => setOldPrice(e.target.value)} inputMode="numeric" />
+      <input aria-label={t('admin_f_stock')} value={stock} onChange={(e) => setStock(e.target.value)} inputMode="numeric" />
+      <select aria-label={t('admin_f_volume')} value={volume} onChange={(e) => setVolume(e.target.value)}>
         {ALLOWED_VOLUMES.map((v) => (
           <option key={v} value={String(v)}>
             {v} мл
           </option>
         ))}
       </select>
-      <input aria-label="Фото (URL)" value={photo} onChange={(e) => setPhoto(e.target.value)} maxLength={300} />
+      <input aria-label={t('admin_f_photo')} value={photo} onChange={(e) => setPhoto(e.target.value)} maxLength={300} />
       <label>
         <input type="checkbox" checked={isHit} onChange={(e) => setIsHit(e.target.checked)} />
-        Хіт
+        {t('admin_hit')}
       </label>
-      <button type="submit">Додати товар</button>
+      <button type="submit">{t('admin_add_product')}</button>
     </form>
   );
 }
@@ -214,7 +228,9 @@ export default function Admin({
   ordersUrl = ADMIN_ORDERS_URL,
   settingsUrl = ADMIN_SETTINGS_URL,
   promosUrl = ADMIN_PROMOS_URL,
+  locale = 'uk',
 }: AdminProps) {
+  const t = (key: string): string => ADMIN_STRINGS[locale][key] ?? key;
   const fetcher: FetchImpl = fetchImpl ?? defaultFetch;
   const [gate, setGate] = useState<Gate>('checking');
   const [section, setSection] = useState<Section>('products');
@@ -281,16 +297,16 @@ export default function Admin({
 
   if (gate === 'checking') {
     return (
-      <section aria-label="Адмін">
-        <Skeleton height={120} label="Завантаження…" />
+      <section className="fd-admin" aria-label={t('admin_title')}>
+        <Skeleton height={120} label={t('loading')} locale={locale} />
       </section>
     );
   }
 
   if (gate === 'denied') {
     return (
-      <section aria-label="Адмін">
-        <h1>{ADMIN_DENIED_LABEL}</h1>
+      <section className="fd-admin" aria-label={t('admin_title')}>
+        <h1>{t('admin_denied')}</h1>
       </section>
     );
   }
@@ -308,7 +324,7 @@ export default function Admin({
         usernames,
       }),
     });
-    if (res.ok) notify(ADMIN_SAVED_LABEL);
+    if (res.ok) notify(t('admin_saved'));
   };
 
   const savePromo = async () => {
@@ -317,33 +333,33 @@ export default function Admin({
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ id: Number(promoId), is_active: promoActive }),
     });
-    if (res.ok) notify(ADMIN_SAVED_LABEL);
+    if (res.ok) notify(t('admin_saved'));
   };
 
   return (
-    <section aria-label="Адмін">
-      <h1>Адмін</h1>
-      <div role="tablist" aria-label="Розділи">
+    <section className="fd-admin" aria-label={t('admin_title')}>
+      <h1>{t('admin_title')}</h1>
+      <div role="tablist" aria-label={t('admin_sections')}>
         {(['products', 'orders', 'settings'] as Section[]).map((s) => (
           <button key={s} type="button" role="tab" aria-selected={section === s} onClick={() => setSection(s)}>
-            {s === 'products' ? 'Товари' : s === 'orders' ? 'Замовлення' : 'Налаштування'}
+            {s === 'products' ? t('admin_products_tab') : s === 'orders' ? t('admin_orders_tab') : t('admin_settings_tab')}
           </button>
         ))}
       </div>
       {loading ? (
-        <Skeleton height={120} label="Завантаження…" />
+        <Skeleton height={120} label={t('loading')} locale={locale} />
       ) : (
         <>
           {section === 'products' && (
             <div>
-              <ProductForm productsUrl={productsUrl} fetcher={fetcher} onSaved={notify} />
-              <table aria-label="Товари">
+              <ProductForm productsUrl={productsUrl} fetcher={fetcher} onSaved={notify} locale={locale} />
+              <table aria-label={t('admin_products_table')}>
                 <tbody>
                   {products.map((p) => (
                     <tr key={p.id}>
                       <td>{p.name}</td>
                       <td>{p.variants.map((v) => `${v.volume_ml}мл:${v.stock}`).join(', ')}</td>
-                      <td>{p.is_hit ? 'хіт' : ''}</td>
+                      <td>{p.is_hit ? t('admin_hit_badge') : ''}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -351,34 +367,34 @@ export default function Admin({
             </div>
           )}
           {section === 'orders' && (
-            <table aria-label="Замовлення">
+            <table aria-label={t('admin_orders_tab')}>
               <tbody>
                 {orders.map((o) => (
-                  <OrderRow key={o.number} order={o} ordersUrl={ordersUrl} fetcher={fetcher} onSaved={notify} />
+                  <OrderRow key={o.number} order={o} ordersUrl={ordersUrl} fetcher={fetcher} onSaved={notify} locale={locale} />
                 ))}
               </tbody>
             </table>
           )}
           {section === 'settings' && settings && (
             <div>
-              <form aria-label="Налаштування" onSubmit={(e) => void saveSettings(e)}>
-                <input aria-label="Місто відправки" value={dispatchCity} onChange={(e) => setDispatchCity(e.target.value)} />
-                <textarea aria-label="Реквізити" value={cardRequisites} onChange={(e) => setCardRequisites(e.target.value)} />
-                <input aria-label="Ключ провайдера" value={providerKey} onChange={(e) => setProviderKey(e.target.value)} />
+              <form aria-label={t('admin_settings_tab')} onSubmit={(e) => void saveSettings(e)}>
+                <input aria-label={t('admin_city')} value={dispatchCity} onChange={(e) => setDispatchCity(e.target.value)} />
+                <textarea aria-label={t('admin_requisites')} value={cardRequisites} onChange={(e) => setCardRequisites(e.target.value)} />
+                <input aria-label={t('admin_provider_key')} value={providerKey} onChange={(e) => setProviderKey(e.target.value)} />
                 <textarea
-                  aria-label="Юзернейми (по одному в рядку)"
+                  aria-label={t('admin_usernames')}
                   value={usernamesText}
                   onChange={(e) => setUsernamesText(e.target.value)}
                 />
-                <button type="submit">Зберегти налаштування</button>
+                <button type="submit">{t('admin_save_settings')}</button>
               </form>
-              <form aria-label="Промо" onSubmit={(e) => { e.preventDefault(); void savePromo(); }}>
-                <input aria-label="ID промо" value={promoId} onChange={(e) => setPromoId(e.target.value)} inputMode="numeric" />
+              <form aria-label={t('admin_promo')} onSubmit={(e) => { e.preventDefault(); void savePromo(); }}>
+                <input aria-label={t('admin_promo_id')} value={promoId} onChange={(e) => setPromoId(e.target.value)} inputMode="numeric" />
                 <label>
                   <input type="checkbox" checked={promoActive} onChange={(e) => setPromoActive(e.target.checked)} />
-                  Активне
+                  {t('admin_promo_active')}
                 </label>
-                <button type="submit">Зберегти промо</button>
+                <button type="submit">{t('admin_save_promo')}</button>
               </form>
             </div>
           )}

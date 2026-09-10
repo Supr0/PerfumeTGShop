@@ -8,6 +8,12 @@ import { Skeleton } from '../components/feedback';
 import { fetchCatalog } from '../lib/api';
 import { authHeaders } from '../lib/tma';
 import type { FetchImpl } from './Checkout';
+import ukStrings from '../i18n/uk.json';
+import ruStrings from '../i18n/ru.json';
+
+export type OrdersLocale = 'uk' | 'ru';
+
+const ORDERS_STRINGS: Record<OrdersLocale, Record<string, string>> = { uk: ukStrings, ru: ruStrings };
 
 export const ORDERS_URL = '/v1/orders/mine';
 
@@ -63,18 +69,22 @@ export function variantLabelsOf(items: Array<{ name: string; variants: Array<{ i
 }
 
 /** One order line: resolved "Name · 3 мл × qty · line total" or the bare variant fallback. */
-export function orderLineLabel(line: MineOrderItem, labels: Map<number, VariantLabel>): string {
+export function orderLineLabel(line: MineOrderItem, labels: Map<number, VariantLabel>, locale: OrdersLocale = 'uk'): string {
+  const t = (key: string): string => ORDERS_STRINGS[locale][key] ?? key;
   const hit = labels.get(line.variant_id);
-  if (!hit) return `Варіант ${line.variant_id} × ${line.qty}`;
+  if (!hit) return t('order_variant_fallback').replace('{id}', String(line.variant_id)).replace('{qty}', String(line.qty));
   return `${hit.name} · ${hit.volumeMl} мл × ${line.qty} · ${(line.price_minor_uah * line.qty) / 100} ₴`;
 }
 
 interface OrdersProps {
   fetchImpl?: FetchImpl;
   listUrl?: string;
+  /** UI locale — mirrors the App shell switcher; defaults to UK. */
+  locale?: OrdersLocale;
 }
 
-export default function Orders({ fetchImpl, listUrl = ORDERS_URL }: OrdersProps) {
+export default function Orders({ fetchImpl, listUrl = ORDERS_URL, locale = 'uk' }: OrdersProps) {
+  const t = (key: string): string => ORDERS_STRINGS[locale][key] ?? key;
   const fetcher: FetchImpl = fetchImpl ?? defaultFetch;
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [orders, setOrders] = useState<MineOrder[]>([]);
@@ -111,11 +121,11 @@ export default function Orders({ fetchImpl, listUrl = ORDERS_URL }: OrdersProps)
 
   if (status === 'loading') {
     return (
-      <section aria-label="Замовлення">
-        <h1>Замовлення</h1>
-        <div aria-label="Завантаження замовлень">
-          <Skeleton height={72} label="Завантаження…" />
-          <Skeleton height={72} label="Завантаження…" />
+      <section className="fd-orders" aria-label={t('orders_title')}>
+        <h1>{t('orders_title')}</h1>
+        <div aria-label={t('orders_loading')}>
+          <Skeleton height={72} label={t('loading')} locale={locale} />
+          <Skeleton height={72} label={t('loading')} locale={locale} />
         </div>
       </section>
     );
@@ -123,11 +133,11 @@ export default function Orders({ fetchImpl, listUrl = ORDERS_URL }: OrdersProps)
 
   if (status === 'error') {
     return (
-      <section aria-label="Замовлення">
-        <h1>Замовлення</h1>
-        <p role="alert">Не вдалося завантажити замовлення.</p>
+      <section className="fd-orders" aria-label={t('orders_title')}>
+        <h1>{t('orders_title')}</h1>
+        <p role="alert">{t('orders_load_error')}</p>
         <button type="button" onClick={() => setAttempt((n) => n + 1)}>
-          Спробувати ще
+          {t('retry')}
         </button>
       </section>
     );
@@ -135,28 +145,28 @@ export default function Orders({ fetchImpl, listUrl = ORDERS_URL }: OrdersProps)
 
   if (orders.length === 0) {
     return (
-      <section aria-label="Замовлення">
-        <h1>Замовлення</h1>
-        <p>Замовлень поки немає</p>
-        <a href="#/">До каталогу</a>
+      <section className="fd-orders" aria-label={t('orders_title')}>
+        <h1>{t('orders_title')}</h1>
+        <p>{t('orders_empty')}</p>
+        <a href="#/">{t('orders_to_catalog')}</a>
       </section>
     );
   }
 
   return (
-    <section aria-label="Замовлення">
-      <h1>Замовлення</h1>
+    <section className="fd-orders" aria-label={t('orders_title')}>
+      <h1>{t('orders_title')}</h1>
       <ul>
         {orders.map((order) => (
           <li key={order.number}>
-            <article aria-label={`Замовлення №${order.number}`}>
-              <h2>{`Замовлення №${order.number}`}</h2>
-              <p>{`Статус: ${order.status}`}</p>
-              {order.ttn ? <p>{`ТТН: ${order.ttn}`}</p> : null}
-              <p>{`Разом: ${orderTotalMajor(order)} ₴`}</p>
+            <article aria-label={t('order_title').replace('{number}', order.number)}>
+              <h2>{t('order_title').replace('{number}', order.number)}</h2>
+              <p>{t('order_status').replace('{status}', order.status)}</p>
+              {order.ttn ? <p>{t('order_ttn').replace('{ttn}', order.ttn)}</p> : null}
+              <p>{t('order_total').replace('{total}', String(orderTotalMajor(order)))}</p>
               <ul>
                 {order.items.map((line) => (
-                  <li key={line.variant_id}>{orderLineLabel(line, labels)}</li>
+                  <li key={line.variant_id}>{orderLineLabel(line, labels, locale)}</li>
                 ))}
               </ul>
             </article>
@@ -164,7 +174,7 @@ export default function Orders({ fetchImpl, listUrl = ORDERS_URL }: OrdersProps)
         ))}
       </ul>
       <a href={SELLER_HREF} target="_blank" rel="noreferrer">
-        Написати продавцю
+        {t('seller_chat')}
       </a>
     </section>
   );

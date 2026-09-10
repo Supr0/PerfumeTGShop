@@ -526,8 +526,8 @@ form button[type='submit'] {
   margin: 0;
 }
 
-.fd-product section[aria-label='Піраміда аромату'] ul,
-.fd-product section[aria-label='Схожі товари'] ul {
+.fd-product__notes ul,
+.fd-product__similar ul {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -536,7 +536,7 @@ form button[type='submit'] {
   gap: 6px;
 }
 
-.fd-product section[aria-label='Піраміда аромату'] li {
+.fd-product__notes li {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: 8px 12px;
@@ -858,47 +858,47 @@ form button[type='submit'] {
 
 /* ----- R-05 checkout forms ----- */
 
-section[aria-label='Оформлення замовлення'] form,
-section[aria-label='Оформлення замовлення'] form > div {
+.fd-checkout form,
+.fd-checkout form > div {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-section[aria-label='Оформлення замовлення'] form {
+.fd-checkout form {
   gap: 16px;
   /* FIX-3: keep the submit CTA clear of the fixed tabbar (tabbar height + safe-area). */
   padding-bottom: calc(72px + env(safe-area-inset-bottom));
 }
 
-section[aria-label='Оформлення замовлення'] button[type='submit'] {
+.fd-checkout button[type='submit'] {
   scroll-margin-bottom: calc(72px + env(safe-area-inset-bottom));
 }
 
-section[aria-label='Оформлення замовлення'] form input,
-section[aria-label='Оформлення замовлення'] form textarea,
-section[aria-label='Оформлення замовлення'] form select {
+.fd-checkout form input,
+.fd-checkout form textarea,
+.fd-checkout form select {
   width: 100%;
 }
 
-section[aria-label='Оформлення замовлення'] p[role='alert'] {
+.fd-checkout p[role='alert'] {
   color: var(--color-danger);
   font-size: 0.875rem;
   margin: 4px 0 0;
 }
 
-section[aria-label='Оформлення замовлення'] section[aria-label='Оплата'] {
+.fd-checkout .fd-checkout__payment {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-background);
   padding: 12px;
 }
 
-section[aria-label='Оформлення замовлення'] section[aria-label='Оплата'] h2 {
+.fd-checkout .fd-checkout__payment h2 {
   margin-top: 0;
 }
 
-section[aria-label='Замовлення оформлено'] {
+.fd-checkout--done {
   text-align: center;
   padding: 48px 24px;
   display: flex;
@@ -909,7 +909,7 @@ section[aria-label='Замовлення оформлено'] {
 
 /* ----- R-06 orders + favorites ----- */
 
-section[aria-label='Замовлення'] > ul {
+.fd-orders > ul {
   list-style: none;
   margin: 0 0 16px;
   padding: 0;
@@ -918,7 +918,7 @@ section[aria-label='Замовлення'] > ul {
   gap: 12px;
 }
 
-section[aria-label='Замовлення'] article {
+.fd-orders article {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-surface);
@@ -929,7 +929,7 @@ section[aria-label='Замовлення'] article {
   gap: 4px;
 }
 
-section[aria-label='Замовлення'] article h2 {
+.fd-orders article h2 {
   margin: 0;
   font-size: 1rem;
   overflow: hidden;
@@ -939,12 +939,12 @@ section[aria-label='Замовлення'] article h2 {
   -webkit-box-orient: vertical;
 }
 
-section[aria-label='Замовлення'] article p {
+.fd-orders article p {
   margin: 0;
   font-size: 0.9375rem;
 }
 
-section[aria-label='Замовлення'] article p:first-of-type {
+.fd-orders article p:first-of-type {
   display: inline-block;
   align-self: flex-start;
   font-size: 0.8125rem;
@@ -955,7 +955,7 @@ section[aria-label='Замовлення'] article p:first-of-type {
   padding: 2px 10px;
 }
 
-section[aria-label='Замовлення'] article ul {
+.fd-orders article ul {
   margin: 4px 0 0;
   padding-left: 18px;
   color: var(--color-muted);
@@ -991,13 +991,13 @@ section[aria-label='Замовлення'] article ul {
 
 /* ----- R-07 admin ----- */
 
-section[aria-label='Адмін'] div[role='tablist'] {
+.fd-admin div[role='tablist'] {
   display: flex;
   gap: 8px;
   margin-bottom: 16px;
 }
 
-section[aria-label='Адмін'] div[role='tablist'] button {
+.fd-admin div[role='tablist'] button {
   flex: 1;
   border: 1px solid var(--color-border);
   background: var(--color-surface);
@@ -1008,14 +1008,14 @@ section[aria-label='Адмін'] div[role='tablist'] button {
   cursor: pointer;
 }
 
-section[aria-label='Адмін'] div[role='tablist'] button[aria-selected='true'] {
+.fd-admin div[role='tablist'] button[aria-selected='true'] {
   background: var(--color-accent-soft);
   color: var(--color-accent-strong);
   border-color: var(--color-accent);
   font-weight: 700;
 }
 
-section[aria-label='Адмін'] table {
+.fd-admin table {
   display: block;
   overflow-x: auto;
   width: 100%;
@@ -1027,17 +1027,17 @@ section[aria-label='Адмін'] table {
   margin-bottom: 16px;
 }
 
-section[aria-label='Адмін'] td {
+.fd-admin td {
   padding: 8px 10px;
   border-bottom: 1px solid var(--color-border);
   vertical-align: middle;
 }
 
-section[aria-label='Адмін'] tr:last-child td {
+.fd-admin tr:last-child td {
   border-bottom: 0;
 }
 
-section[aria-label='Адмін'] form {
+.fd-admin form {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1048,13 +1048,13 @@ section[aria-label='Адмін'] form {
   background: var(--color-surface);
 }
 
-section[aria-label='Адмін'] form input,
-section[aria-label='Адмін'] form textarea,
-section[aria-label='Адмін'] form select {
+.fd-admin form input,
+.fd-admin form textarea,
+.fd-admin form select {
   width: 100%;
 }
 
-section[aria-label='Адмін'] form label {
+.fd-admin form label {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1063,19 +1063,19 @@ section[aria-label='Адмін'] form label {
 
 /* FIX-4: Хіт checkbox row — label + control on one clean line, checkbox
    without text-input padding so it does not stretch the row. */
-section[aria-label='Адмін'] form label:has(input[type='checkbox']) {
+.fd-admin form label:has(input[type='checkbox']) {
   flex-direction: row;
   align-items: center;
   margin: 0;
 }
 
-section[aria-label='Адмін'] form input[type='checkbox'] {
+.fd-admin form input[type='checkbox'] {
   width: auto;
   flex: 0 0 auto;
   padding: 0;
   accent-color: var(--color-accent-strong);
 }
 
-section[aria-label='Адмін'] h1 {
+.fd-admin h1 {
   text-align: center;
 }

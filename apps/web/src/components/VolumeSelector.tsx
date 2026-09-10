@@ -1,7 +1,11 @@
 import { formatPriceMinor, isOutOfStock } from './ProductCard';
 import type { VariantOut } from './ProductCard';
+import ukStrings from '../i18n/uk.json';
+import ruStrings from '../i18n/ru.json';
 
-const OOS_LABEL = 'Немає в наявності';
+export type VolumeSelectorLocale = 'uk' | 'ru';
+
+const VOLUME_STRINGS: Record<VolumeSelectorLocale, Record<string, string>> = { uk: ukStrings, ru: ruStrings };
 
 interface VolumeSelectorProps {
   variants: VariantOut[];
@@ -19,6 +23,8 @@ interface VolumeSelectorProps {
    * Defaults to false so product-page rendering stays unchanged.
    */
   showOptionPrices?: boolean;
+  /** UI locale — mirrors the App shell switcher; defaults to UK. */
+  locale?: VolumeSelectorLocale;
 }
 
 export function VolumeSelector({
@@ -28,7 +34,10 @@ export function VolumeSelector({
   currency = '₴',
   hideOutOfStock = false,
   showOptionPrices = false,
+  locale = 'uk',
 }: VolumeSelectorProps) {
+  const t = (key: string): string => VOLUME_STRINGS[locale][key] ?? key;
+  const OOS_LABEL = t('out_of_stock');
   const ordered = [...variants].sort((a, b) => a.volume_ml - b.volume_ml);
   const selected = value == null ? undefined : (ordered.find((v) => v.volume_ml === value) ?? ordered[0]);
   // hideOutOfStock hides OOS options, but the current value always stays
@@ -37,7 +46,7 @@ export function VolumeSelector({
 
   return (
     <div className="fd-volume-selector">
-      <div className="fd-volume-selector__options" role="radiogroup" aria-label="Обʼєм">
+      <div className="fd-volume-selector__options" role="radiogroup" aria-label={t('volume_group')}>
         {visible.map((v) => {
           const oos = isOutOfStock(v);
           return (

@@ -12,13 +12,15 @@ import { ProductCard } from '../components/ProductCard';
 import type { Product, AddToCartHandler } from '../components/ProductCard';
 import { FilterSheet, DEFAULT_FILTERS } from '../components/FilterSheet';
 import type { FilterValue } from '../components/FilterSheet';
-import { ADDED_TO_CART_LABEL, EmptyState, Skeleton, Toast } from '../components/feedback';
+import { EmptyState, Skeleton, Toast } from '../components/feedback';
 import { loadFavorites, persistFavorites, toggleFavorite } from './Favorites';
+import ukStrings from '../i18n/uk.json';
+import ruStrings from '../i18n/ru.json';
 
-const EMPTY_LABEL = 'Нічого не знайдено';
-const LOAD_ERROR_LABEL = 'Не вдалося завантажити каталог.';
-const RETRY_LABEL = 'Спробувати ще';
-const RESET_LABEL = 'Скинути фільтри';
+export type HomeLocale = 'uk' | 'ru';
+
+const HOME_STRINGS: Record<HomeLocale, Record<string, string>> = { uk: ukStrings, ru: ruStrings };
+
 const SEARCH_DEBOUNCE_MS = 300;
 
 /** Unique sorted values, flattening array fields (season) into individuals. */
@@ -57,9 +59,12 @@ interface HomeProps {
   /** Test seam — defaults to the global fetch. */
   fetchImpl?: FetchFn;
   onAddToCart?: AddToCartHandler;
+  /** UI locale — mirrors the App shell switcher; defaults to UK. */
+  locale?: HomeLocale;
 }
 
-export function Home({ fetchImpl, onAddToCart }: HomeProps) {
+export function Home({ fetchImpl, onAddToCart, locale = 'uk' }: HomeProps) {
+  const t = (key: string): string => HOME_STRINGS[locale][key] ?? key;
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [activeFamily, setActiveFamily] = useState<string>('all');
@@ -132,7 +137,7 @@ export function Home({ fetchImpl, onAddToCart }: HomeProps) {
       persistCart(next);
     }
     onAddToCart?.(productId, variantId);
-    setToast(ADDED_TO_CART_LABEL);
+    setToast(t('added_to_cart'));
   };
 
   const toggleHeart = (productId: number) => {
@@ -140,21 +145,21 @@ export function Home({ fetchImpl, onAddToCart }: HomeProps) {
   };
 
   return (
-    <section className="fd-home" aria-label="Каталог">
+    <section className="fd-home" aria-label={t('catalog')}>
       <input
         type="search"
-        aria-label="Пошук"
-        placeholder="Пошук"
+        aria-label={t('search')}
+        placeholder={t('search')}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
       />
-      <div className="fd-chips" role="group" aria-label="Сімейства">
+      <div className="fd-chips" role="group" aria-label={t('chips_group')}>
         <button
           type="button"
           aria-pressed={activeFamily === 'all'}
           onClick={() => setActiveFamily('all')}
         >
-          Всі
+          {t('chips_all')}
         </button>
         {families.map((f) => (
           <button
@@ -168,7 +173,7 @@ export function Home({ fetchImpl, onAddToCart }: HomeProps) {
         ))}
       </div>
       <button type="button" onClick={() => setSheetOpen(true)}>
-        Фільтри
+        {t('filters')}
       </button>
       <FilterSheet
         open={sheetOpen}
@@ -180,26 +185,27 @@ export function Home({ fetchImpl, onAddToCart }: HomeProps) {
         onChange={setFilters}
         onClose={() => setSheetOpen(false)}
         onReset={() => setFilters(DEFAULT_FILTERS)}
+        locale={locale}
       />
       {status === 'loading' ? (
-        <div className="fd-grid" aria-label="Завантаження каталогу">
+        <div className="fd-grid" aria-label={t('home_loading')}>
           {Array.from({ length: 6 }, (_, i) => (
-            <Skeleton key={i} height={180} label="Завантаження…" />
+            <Skeleton key={i} height={180} label={t('loading')} locale={locale} />
           ))}
         </div>
       ) : status === 'error' ? (
         <div>
-          <p role="alert">{LOAD_ERROR_LABEL}</p>
+          <p role="alert">{t('home_load_error')}</p>
           <button type="button" onClick={() => setAttempt((n) => n + 1)}>
-            {RETRY_LABEL}
+            {t('retry')}
           </button>
         </div>
       ) : items.length === 0 ? (
         <EmptyState
-          title={EMPTY_LABEL}
+          title={t('home_empty')}
           action={
             <button type="button" onClick={resetAll}>
-              {RESET_LABEL}
+              {t('home_reset_filters')}
             </button>
           }
         />
@@ -212,6 +218,7 @@ export function Home({ fetchImpl, onAddToCart }: HomeProps) {
               isFavorite={favorites.includes(String(p.id))}
               onAdd={handleAdd}
               onToggleFavorite={toggleHeart}
+              locale={locale}
             />
           ))}
         </div>

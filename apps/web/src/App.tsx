@@ -165,15 +165,15 @@ export default function App() {
         <LocaleSwitcher locale={locale} onChange={setLocale} />
       </header>
       <main className="fd-main">
-        {route.name === 'catalog' && <Home />}
+        {route.name === 'catalog' && <Home locale={locale} />}
         {route.name === 'product' && route.productId != null && (
-          <ProductPage key={route.productId} productId={route.productId} />
+          <ProductPage key={route.productId} productId={route.productId} locale={locale} />
         )}
         {route.name === 'cart' && <Cart locale={locale} />}
-        {route.name === 'checkout' && <Checkout />}
-        {route.name === 'orders' && <Orders />}
+        {route.name === 'checkout' && <Checkout locale={locale} />}
+        {route.name === 'orders' && <Orders locale={locale} />}
         {route.name === 'favorites' && <Favorites locale={locale} />}
-        {route.name === 'admin' && <Admin />}
+        {route.name === 'admin' && <Admin locale={locale} />}
       </main>
       <TabBar
         tabs={visibleTabs}
