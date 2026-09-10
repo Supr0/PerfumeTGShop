@@ -114,6 +114,7 @@ export function FilterSheet({
     closingRef.current = true;
     setClosing(true);
     closeTimerRef.current = window.setTimeout(() => {
+      closeTimerRef.current = undefined;
       onCloseRef.current();
     }, FILTER_SHEET_CLOSE_MS);
   }, []);
@@ -123,12 +124,23 @@ export function FilterSheet({
     return () => {
       if (closeTimerRef.current !== undefined) {
         window.clearTimeout(closeTimerRef.current);
+        closeTimerRef.current = undefined;
       }
     };
   }, []);
 
   useEffect(() => {
     if (!open) return;
+    // The owner (Home) keeps this instance mounted across open cycles
+    // (open=false renders null), so stale closing state from the previous
+    // cycle must be cleared — otherwise the reopened sheet renders stuck
+    // in the closing animation with requestClose guarded off (dead buttons).
+    if (closeTimerRef.current !== undefined) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = undefined;
+    }
+    closingRef.current = false;
+    setClosing(false);
     // Focus bookkeeping: focus the first control on open,
     // return focus to the invoker on unmount/close.
     const previouslyFocused = document.activeElement as HTMLElement | null;

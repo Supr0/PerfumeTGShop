@@ -241,4 +241,141 @@ describe('FilterSheet', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(document.activeElement).toBe(invoker);
   });
+
+  it('should stay interactive after button close and reopen', () => {
+    vi.useFakeTimers();
+    const onChange = vi.fn();
+    function Harness() {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>
+            Фільтри
+          </button>
+          <FilterSheet
+            open={open}
+            brands={['Creed']}
+            families={[]}
+            genders={[]}
+            seasons={[]}
+            value={DEFAULT_FILTERS}
+            onChange={onChange}
+            onClose={() => setOpen(false)}
+            onReset={() => {}}
+          />
+        </>
+      );
+    }
+    render(<Harness />);
+    // first cycle: open → close via footer button
+    fireEvent.click(screen.getByRole('button', { name: 'Фільтри' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Показати' }));
+    act(() => {
+      vi.advanceTimersByTime(FILTER_SHEET_CLOSE_MS);
+    });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    // reopen: no stuck closing state
+    fireEvent.click(screen.getByRole('button', { name: 'Фільтри' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).not.toHaveClass('fd-filter-sheet--closing');
+    // inputs still work
+    fireEvent.click(screen.getByText('Creed'));
+    expect(onChange).toHaveBeenCalledTimes(1);
+    // close still works on the second cycle
+    fireEvent.click(screen.getByRole('button', { name: 'Показати' }));
+    expect(screen.getByRole('dialog')).toHaveClass('fd-filter-sheet--closing');
+    act(() => {
+      vi.advanceTimersByTime(FILTER_SHEET_CLOSE_MS);
+    });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('should stay interactive after backdrop close and reopen', () => {
+    vi.useFakeTimers();
+    const onChange = vi.fn();
+    function Harness() {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>
+            Фільтри
+          </button>
+          <FilterSheet
+            open={open}
+            brands={['Creed']}
+            families={[]}
+            genders={[]}
+            seasons={[]}
+            value={DEFAULT_FILTERS}
+            onChange={onChange}
+            onClose={() => setOpen(false)}
+            onReset={() => {}}
+          />
+        </>
+      );
+    }
+    render(<Harness />);
+    fireEvent.click(screen.getByRole('button', { name: 'Фільтри' }));
+    fireEvent.click(screen.getByTestId('filter-sheet-backdrop'));
+    act(() => {
+      vi.advanceTimersByTime(FILTER_SHEET_CLOSE_MS);
+    });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Фільтри' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).not.toHaveClass('fd-filter-sheet--closing');
+    fireEvent.click(screen.getByText('Creed'));
+    expect(onChange).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByTestId('filter-sheet-backdrop'));
+    expect(screen.getByRole('dialog')).toHaveClass('fd-filter-sheet--closing');
+    act(() => {
+      vi.advanceTimersByTime(FILTER_SHEET_CLOSE_MS);
+    });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('should stay interactive after Escape close and reopen', () => {
+    vi.useFakeTimers();
+    const onChange = vi.fn();
+    function Harness() {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>
+            Фільтри
+          </button>
+          <FilterSheet
+            open={open}
+            brands={['Creed']}
+            families={[]}
+            genders={[]}
+            seasons={[]}
+            value={DEFAULT_FILTERS}
+            onChange={onChange}
+            onClose={() => setOpen(false)}
+            onReset={() => {}}
+          />
+        </>
+      );
+    }
+    render(<Harness />);
+    fireEvent.click(screen.getByRole('button', { name: 'Фільтри' }));
+    fireEvent.keyDown(document, { key: 'Escape' });
+    act(() => {
+      vi.advanceTimersByTime(FILTER_SHEET_CLOSE_MS);
+    });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Фільтри' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).not.toHaveClass('fd-filter-sheet--closing');
+    fireEvent.click(screen.getByText('Creed'));
+    expect(onChange).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.getByRole('dialog')).toHaveClass('fd-filter-sheet--closing');
+    act(() => {
+      vi.advanceTimersByTime(FILTER_SHEET_CLOSE_MS);
+    });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
 });
