@@ -42,6 +42,7 @@
   "home_loading": "Загрузка каталога",
   "loading": "Загрузка…",
   "added_to_cart": "Добавлено в корзину",
+  "add_failed": "Не удалось добавить в корзину",
   "filter_title": "Фильтры",
   "filter_brand": "Бренд",
   "filter_family": "Семейство",

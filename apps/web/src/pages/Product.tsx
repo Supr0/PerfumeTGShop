@@ -9,6 +9,7 @@
  */
 import { useEffect, useState } from 'react';
 import { fetchCatalog, fetchProduct, type FetchFn } from '../lib/api';
+import { addItem, loadCart, persistCart } from '../lib/cart';
 import { VolumeSelector } from '../components/VolumeSelector';
 import { isOutOfStock } from '../components/ProductCard';
 import type { Product, AddToCartHandler } from '../components/ProductCard';
@@ -159,9 +160,28 @@ export function ProductPage({ productId, product: productProp, loading = false, 
     product.variants.find((v) => v.volume_ml === activeVolume) ?? product.variants[0] ?? null;
 
   const handleAdd = () => {
-    if (!activeVariant || isOutOfStock(activeVariant)) return;
-    onAddToCart?.(product.id, activeVariant.id);
-    setToast(t('added_to_cart'));
+    // Same add semantics as Home.handleAdd — keep in sync: addItem is a
+    // no-op when stock is 0 and persistCart can fail when storage is
+    // unavailable, so only claim success when the line actually landed.
+    // Toasting unconditionally masked failed adds (tap → toast → empty cart).
+    let added = false;
+    if (activeVariant && activeVariant.stock > 0) {
+      const next = addItem(
+        loadCart(),
+        {
+          productId: String(product.id),
+          variantId: activeVariant.id,
+          volume_ml: activeVariant.volume_ml,
+          qty: 1,
+          price: activeVariant.price_minor_uah / 100,
+          name: product.name,
+        },
+        activeVariant.stock,
+      );
+      added = persistCart(next);
+    }
+    if (activeVariant) onAddToCart?.(product.id, activeVariant.id);
+    setToast(t(added ? 'added_to_cart' : 'add_failed'));
   };
 
   const notes = [

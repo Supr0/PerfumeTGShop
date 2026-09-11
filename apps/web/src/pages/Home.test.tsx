@@ -130,6 +130,46 @@ describe('Home (wired to the real catalog API)', () => {
     ]);
     expect(screen.getByText(/додано|добавлено|added/i)).toBeInTheDocument();
   });
+
+  it('should add the in-stock duplicate when volume rows repeat', async () => {
+    const dupes: Product[] = [
+      {
+        ...products[0],
+        variants: [
+          { id: 11, volume_ml: 3, price_minor_uah: 39000, old_price_minor_uah: null, stock: 0 },
+          { id: 12, volume_ml: 3, price_minor_uah: 42000, old_price_minor_uah: null, stock: 5 },
+          { id: 13, volume_ml: 10, price_minor_uah: 99000, old_price_minor_uah: null, stock: 2 },
+        ],
+      },
+    ];
+    render(<Home fetchImpl={vi.fn().mockResolvedValue(catalogResponse(dupes))} />);
+    const addButtons = await screen.findAllByRole('button', { name: /додати/i });
+    fireEvent.click(addButtons[0]);
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('radio', { name: /3\s?ml/i }));
+    expect(loadCart()).toEqual([
+      expect.objectContaining({ productId: '1', variantId: 12, volume_ml: 3, qty: 1 }),
+    ]);
+    expect(screen.getByText(/додано|добавлено|added/i)).toBeInTheDocument();
+  });
+
+  it('should not claim success when the picked line could not persist', async () => {
+    Object.defineProperty(window, 'localStorage', { value: null, configurable: true });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      render(<Home fetchImpl={vi.fn().mockResolvedValue(catalogResponse())} />);
+      const addButtons = await screen.findAllByRole('button', { name: /додати/i });
+      fireEvent.click(addButtons[0]);
+      expect(await screen.findByRole('dialog')).toBeInTheDocument();
+      const options = await screen.findAllByRole('radio');
+      fireEvent.click(options[0]);
+      expect(loadCart()).toEqual([]);
+      expect(screen.queryByText(/додано до кошика|добавлено в корзину|added to cart/i)).not.toBeInTheDocument();
+      expect(screen.getByText(/не вдалося додати|не удалось добавить|could not be added/i)).toBeInTheDocument();
+    } finally {
+      warn.mockRestore();
+    }
+  });
 });
 
 describe('buildCatalogQuery', () => {

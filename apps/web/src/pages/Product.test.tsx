@@ -2,6 +2,29 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { ProductPage } from './Product';
 import type { Product } from '../components/ProductCard';
+import { loadCart } from '../lib/cart';
+
+class MemoryStorage implements Storage {
+  private data = new Map<string, string>();
+  get length(): number {
+    return this.data.size;
+  }
+  key(index: number): string | null {
+    return [...this.data.keys()][index] ?? null;
+  }
+  getItem(key: string): string | null {
+    return this.data.get(key) ?? null;
+  }
+  setItem(key: string, value: string): void {
+    this.data.set(key, value);
+  }
+  removeItem(key: string): void {
+    this.data.delete(key);
+  }
+  clear(): void {
+    this.data.clear();
+  }
+}
 
 /** Fixture mirrors the real ProductOut shape: notes are strings, season is an array. */
 const product: Product = {
@@ -39,6 +62,9 @@ function catalogOf(items: Product[]) {
 }
 
 beforeEach(() => {
+  // jsdom without a url has an opaque origin (no working localStorage) —
+  // same MemoryStorage stand-in as Home.test.tsx so store writes behave.
+  Object.defineProperty(window, 'localStorage', { value: new MemoryStorage(), configurable: true });
   vi.restoreAllMocks();
 });
 
@@ -75,6 +101,60 @@ describe('ProductPage presentational', () => {
     fireEvent.click(screen.getByRole('button', { name: /додати|добавить|add/i }));
     expect(onAddToCart).toHaveBeenCalledWith(1, 11);
     expect(screen.getByText(/додано|добавлено|added/i)).toBeInTheDocument();
+  });
+});
+
+describe('ProductPage add-to-cart (real store)', () => {
+  it('should write the default in-stock variant line to the cart store on Add', () => {
+    render(<ProductPage product={product} fetchImpl={vi.fn().mockResolvedValue(catalogOf([]))} />);
+    fireEvent.click(screen.getByRole('button', { name: /додати|добавить|add/i }));
+    expect(loadCart()).toEqual([
+      expect.objectContaining({ productId: '1', variantId: 11, volume_ml: 3, qty: 1 }),
+    ]);
+    expect(screen.getByText(/додано|добавлено|added/i)).toBeInTheDocument();
+  });
+
+  it('should honor the selected volume when writing the cart line', () => {
+    render(<ProductPage product={product} fetchImpl={vi.fn().mockResolvedValue(catalogOf([]))} />);
+    fireEvent.click(screen.getByRole('radio', { name: /10\s?ml/i }));
+    fireEvent.click(screen.getByRole('button', { name: /додати|добавить|add/i }));
+    expect(loadCart()).toEqual([
+      expect.objectContaining({ productId: '1', variantId: 13, volume_ml: 10, qty: 1 }),
+    ]);
+    expect(screen.getByText(/додано|добавлено|added/i)).toBeInTheDocument();
+  });
+
+  it('should keep the out-of-stock volume unselectable and unaddable', () => {
+    render(<ProductPage product={product} fetchImpl={vi.fn().mockResolvedValue(catalogOf([]))} />);
+    // The OOS 5 ml option is disabled at the selector — it cannot be picked.
+    expect(screen.getByRole('radio', { name: /5\s?ml/i })).toBeDisabled();
+    expect(loadCart()).toEqual([]);
+  });
+
+  it('should disable Add and write nothing when every variant is out of stock', () => {
+    const oosProduct: Product = {
+      ...product,
+      variants: product.variants.map((v) => ({ ...v, stock: 0 })),
+    };
+    render(<ProductPage product={oosProduct} fetchImpl={vi.fn().mockResolvedValue(catalogOf([]))} />);
+    const add = screen.getByRole('button', { name: /додати|добавить|add/i });
+    expect(add).toBeDisabled();
+    fireEvent.click(add);
+    expect(loadCart()).toEqual([]);
+  });
+
+  it('should not claim success when the line could not persist', () => {
+    Object.defineProperty(window, 'localStorage', { value: null, configurable: true });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      render(<ProductPage product={product} fetchImpl={vi.fn().mockResolvedValue(catalogOf([]))} />);
+      fireEvent.click(screen.getByRole('button', { name: /додати|добавить|add/i }));
+      expect(loadCart()).toEqual([]);
+      expect(screen.queryByText(/додано до кошика|добавлено в корзину|added to cart/i)).not.toBeInTheDocument();
+      expect(screen.getByText(/не вдалося додати|не удалось добавить|could not be added/i)).toBeInTheDocument();
+    } finally {
+      warn.mockRestore();
+    }
   });
 });
 

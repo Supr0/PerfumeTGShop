@@ -121,7 +121,11 @@ export function Home({ fetchImpl, onAddToCart, locale = 'uk' }: HomeProps) {
   const handleAdd: AddToCartHandler = (productId, variantId) => {
     const product = items.find((p) => p.id === productId);
     const variant = product?.variants.find((v) => v.id === variantId);
-    if (product && variant) {
+    // addItem is a no-op when stock is 0, and persistCart can fail when
+    // storage is unavailable — only claim success when the line landed.
+    // Toasting unconditionally masked failed adds (tap → toast → empty cart).
+    let added = false;
+    if (product && variant && variant.stock > 0) {
       const next = addItem(
         loadCart(),
         {
@@ -134,10 +138,10 @@ export function Home({ fetchImpl, onAddToCart, locale = 'uk' }: HomeProps) {
         },
         variant.stock,
       );
-      persistCart(next);
+      added = persistCart(next);
     }
     onAddToCart?.(productId, variantId);
-    setToast(t('added_to_cart'));
+    setToast(t(added ? 'added_to_cart' : 'add_failed'));
   };
 
   const toggleHeart = (productId: number) => {

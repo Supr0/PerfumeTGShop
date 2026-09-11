@@ -126,6 +126,21 @@ describe('VolumeSheet', () => {
     expect(screen.getByRole('dialog')).not.toHaveClass('fd-volume-sheet--closing');
   });
 
+  it('should resolve a tapped volume to the in-stock duplicate instead of dropping the pick', () => {
+    const dupes: Product = {
+      ...product,
+      variants: [
+        { id: 11, volume_ml: 3, price_minor_uah: 39000, old_price_minor_uah: null, stock: 0 },
+        { id: 12, volume_ml: 3, price_minor_uah: 42000, old_price_minor_uah: null, stock: 5 },
+        { id: 13, volume_ml: 10, price_minor_uah: 99000, old_price_minor_uah: null, stock: 2 },
+      ],
+    };
+    const onPick = vi.fn();
+    render(<VolumeSheet product={dupes} onPick={onPick} onClose={() => {}} />);
+    fireEvent.click(screen.getByRole('radio', { name: /3\s?ml/i }));
+    expect(onPick).toHaveBeenCalledWith(1, 12);
+  });
+
   it('should never render a toast', () => {
     const onPick = vi.fn();
     const { container } = render(<VolumeSheet product={product} onPick={onPick} onClose={() => {}} />);

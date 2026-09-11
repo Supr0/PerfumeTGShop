@@ -84,7 +84,13 @@ export function VolumeSheet({ product, currency = '₴', onPick, onClose, locale
   }, [requestClose]);
 
   const handlePick = (volumeMl: number) => {
-    const variant = product.variants.find((v) => v.volume_ml === volumeMl);
+    // Volumes are NOT unique keys — duplicate volume rows are possible,
+    // so resolve the tapped volume to a purchasable variant, preferring an
+    // in-stock match. Blindly taking the first row could land on an
+    // out-of-stock duplicate and silently swallow the tap (nothing reaches
+    // onPick, nothing lands in the cart).
+    const matches = product.variants.filter((v) => v.volume_ml === volumeMl);
+    const variant = matches.find((v) => !isOutOfStock(v)) ?? matches[0];
     if (!variant) return;
     if (isOutOfStock(variant)) return;
     onPick(product.id, variant.id);

@@ -42,6 +42,7 @@
   "home_loading": "Завантаження каталогу",
   "loading": "Завантаження…",
   "added_to_cart": "Додано до кошика",
+  "add_failed": "Не вдалося додати до кошика",
   "filter_title": "Фільтри",
   "filter_brand": "Бренд",
   "filter_family": "Сімейство",
