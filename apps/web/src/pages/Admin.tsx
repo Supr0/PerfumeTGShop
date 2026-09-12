@@ -123,7 +123,8 @@ function OrderRow({
     <tr>
       <td>{order.number}</td>
       <td>
-        <select aria-label={t('admin_status_label').replace('{number}', order.number)} value={status} onChange={(e) => setStatus(e.target.value)}>
+        <label htmlFor={`admin-order-status-${order.number}`}>{t('admin_status_label').replace('{number}', order.number)}</label>
+        <select id={`admin-order-status-${order.number}`} aria-label={t('admin_status_label').replace('{number}', order.number)} value={status} onChange={(e) => setStatus(e.target.value)}>
           {ORDER_STATUSES.map((s) => (
             <option key={s} value={s}>
               {s}
@@ -132,7 +133,8 @@ function OrderRow({
         </select>
       </td>
       <td>
-        <input aria-label={t('admin_ttn_label').replace('{number}', order.number)} value={ttn} onChange={(e) => setTtn(e.target.value)} />
+        <label htmlFor={`admin-order-ttn-${order.number}`}>{t('admin_ttn_label').replace('{number}', order.number)}</label>
+        <input id={`admin-order-ttn-${order.number}`} aria-label={t('admin_ttn_label').replace('{number}', order.number)} value={ttn} onChange={(e) => setTtn(e.target.value)} />
       </td>
       <td>
         <button type="button" disabled={saving} onClick={() => void save()}>
@@ -199,21 +201,28 @@ function ProductForm({
 
   return (
     <form aria-label={t('admin_new_product')} onSubmit={(e) => void create(e)}>
-      <input aria-label={t('admin_f_name')} value={name} onChange={(e) => setName(e.target.value)} maxLength={200} />
-      <input aria-label={t('admin_f_brand')} value={brand} onChange={(e) => setBrand(e.target.value)} maxLength={200} />
-      <input aria-label={t('admin_f_price')} value={price} onChange={(e) => setPrice(e.target.value)} inputMode="numeric" />
-      <input aria-label={t('admin_f_old_price')} value={oldPrice} onChange={(e) => setOldPrice(e.target.value)} inputMode="numeric" />
-      <input aria-label={t('admin_f_stock')} value={stock} onChange={(e) => setStock(e.target.value)} inputMode="numeric" />
-      <select aria-label={t('admin_f_volume')} value={volume} onChange={(e) => setVolume(e.target.value)}>
+      <label htmlFor="admin-p-name">{t('admin_f_name')}</label>
+      <input id="admin-p-name" aria-label={t('admin_f_name')} value={name} onChange={(e) => setName(e.target.value)} maxLength={200} />
+      <label htmlFor="admin-p-brand">{t('admin_f_brand')}</label>
+      <input id="admin-p-brand" aria-label={t('admin_f_brand')} value={brand} onChange={(e) => setBrand(e.target.value)} maxLength={200} />
+      <label htmlFor="admin-p-price">{t('admin_f_price')}</label>
+      <input id="admin-p-price" aria-label={t('admin_f_price')} value={price} onChange={(e) => setPrice(e.target.value)} inputMode="numeric" />
+      <label htmlFor="admin-p-old-price">{t('admin_f_old_price')}</label>
+      <input id="admin-p-old-price" aria-label={t('admin_f_old_price')} value={oldPrice} onChange={(e) => setOldPrice(e.target.value)} inputMode="numeric" />
+      <label htmlFor="admin-p-stock">{t('admin_f_stock')}</label>
+      <input id="admin-p-stock" aria-label={t('admin_f_stock')} value={stock} onChange={(e) => setStock(e.target.value)} inputMode="numeric" />
+      <label htmlFor="admin-p-volume">{t('admin_f_volume')}</label>
+      <select id="admin-p-volume" aria-label={t('admin_f_volume')} value={volume} onChange={(e) => setVolume(e.target.value)}>
         {ALLOWED_VOLUMES.map((v) => (
           <option key={v} value={String(v)}>
             {v} мл
           </option>
         ))}
       </select>
-      <input aria-label={t('admin_f_photo')} value={photo} onChange={(e) => setPhoto(e.target.value)} maxLength={300} />
-      <label>
-        <input type="checkbox" checked={isHit} onChange={(e) => setIsHit(e.target.checked)} />
+      <label htmlFor="admin-p-photo">{t('admin_f_photo')}</label>
+      <input id="admin-p-photo" aria-label={t('admin_f_photo')} value={photo} onChange={(e) => setPhoto(e.target.value)} maxLength={300} />
+      <label htmlFor="admin-p-hit">
+        <input id="admin-p-hit" type="checkbox" checked={isHit} onChange={(e) => setIsHit(e.target.checked)} />
         {t('admin_hit')}
       </label>
       <button type="submit">{t('admin_add_product')}</button>
@@ -378,10 +387,15 @@ export default function Admin({
           {section === 'settings' && settings && (
             <div>
               <form aria-label={t('admin_settings_tab')} onSubmit={(e) => void saveSettings(e)}>
-                <input aria-label={t('admin_city')} value={dispatchCity} onChange={(e) => setDispatchCity(e.target.value)} />
-                <textarea aria-label={t('admin_requisites')} value={cardRequisites} onChange={(e) => setCardRequisites(e.target.value)} />
-                <input aria-label={t('admin_provider_key')} value={providerKey} onChange={(e) => setProviderKey(e.target.value)} />
+                <label htmlFor="admin-s-city">{t('admin_city')}</label>
+                <input id="admin-s-city" aria-label={t('admin_city')} value={dispatchCity} onChange={(e) => setDispatchCity(e.target.value)} />
+                <label htmlFor="admin-s-requisites">{t('admin_requisites')}</label>
+                <textarea id="admin-s-requisites" aria-label={t('admin_requisites')} value={cardRequisites} onChange={(e) => setCardRequisites(e.target.value)} />
+                <label htmlFor="admin-s-provider">{t('admin_provider_key')}</label>
+                <input id="admin-s-provider" aria-label={t('admin_provider_key')} value={providerKey} onChange={(e) => setProviderKey(e.target.value)} />
+                <label htmlFor="admin-s-usernames">{t('admin_usernames')}</label>
                 <textarea
+                  id="admin-s-usernames"
                   aria-label={t('admin_usernames')}
                   value={usernamesText}
                   onChange={(e) => setUsernamesText(e.target.value)}
@@ -389,9 +403,10 @@ export default function Admin({
                 <button type="submit">{t('admin_save_settings')}</button>
               </form>
               <form aria-label={t('admin_promo')} onSubmit={(e) => { e.preventDefault(); void savePromo(); }}>
-                <input aria-label={t('admin_promo_id')} value={promoId} onChange={(e) => setPromoId(e.target.value)} inputMode="numeric" />
-                <label>
-                  <input type="checkbox" checked={promoActive} onChange={(e) => setPromoActive(e.target.checked)} />
+                <label htmlFor="admin-promo-id">{t('admin_promo_id')}</label>
+                <input id="admin-promo-id" aria-label={t('admin_promo_id')} value={promoId} onChange={(e) => setPromoId(e.target.value)} inputMode="numeric" />
+                <label htmlFor="admin-promo-active">
+                  <input id="admin-promo-active" type="checkbox" checked={promoActive} onChange={(e) => setPromoActive(e.target.checked)} />
                   {t('admin_promo_active')}
                 </label>
                 <button type="submit">{t('admin_save_promo')}</button>

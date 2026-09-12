@@ -239,3 +239,103 @@ describe('App swipe tab navigation', () => {
     expect(window.location.hash).toBe('#/favorites');
   });
 });
+
+describe('App swipe from every tab + slide transition', () => {
+  beforeEach(() => {
+    window.location.hash = '#/';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        const url = String(input);
+        if (url.includes('/v1/admin/me'))
+          return { ok: false, status: 403, json: async () => ({ detail: 'forbidden' }) };
+        if (url.startsWith('/v1/products/'))
+          return { ok: true, status: 200, json: async () => ROUTE_PRODUCT };
+        if (url.includes('/v1/catalog'))
+          return { ok: true, status: 200, json: async () => ({ items: [ROUTE_PRODUCT], total: 1 }) };
+        return { ok: false, status: 404, json: async () => ({ detail: 'not found' }) };
+      }),
+    );
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+    window.location.hash = '#/';
+  });
+
+  function swipe(el: Element, sx: number, sy: number, ex: number, ey: number) {
+    fireEvent.touchStart(el, { touches: [{ clientX: sx, clientY: sy }] });
+    fireEvent.touchEnd(el, { changedTouches: [{ clientX: ex, clientY: ey }] });
+  }
+
+  function mainEl(): Element {
+    const el = document.querySelector('.fd-main');
+    if (!el) throw new Error('main (.fd-main) not found');
+    return el;
+  }
+
+  it('should swipe from cart to orders and back', () => {
+    window.location.hash = '#/cart';
+    render(<App />);
+    swipe(mainEl(), 200, 200, 100, 200);
+    expect(window.location.hash).toBe('#/orders');
+    swipe(mainEl(), 100, 200, 200, 205);
+    expect(window.location.hash).toBe('#/cart');
+  });
+
+  it('should swipe from orders to favorites and back', () => {
+    window.location.hash = '#/orders';
+    render(<App />);
+    swipe(mainEl(), 200, 200, 100, 200);
+    expect(window.location.hash).toBe('#/favorites');
+    swipe(mainEl(), 100, 200, 200, 205);
+    expect(window.location.hash).toBe('#/orders');
+  });
+
+  it('should chain successive swipes across all tabs on one mount', async () => {
+    render(<App />);
+    expect(await screen.findByText('Aventus')).toBeInTheDocument();
+    swipe(mainEl(), 200, 200, 100, 200);
+    expect(window.location.hash).toBe('#/cart');
+    swipe(mainEl(), 200, 200, 100, 200);
+    expect(window.location.hash).toBe('#/orders');
+    swipe(mainEl(), 200, 200, 100, 200);
+    expect(window.location.hash).toBe('#/favorites');
+    swipe(mainEl(), 200, 200, 100, 200);
+    expect(window.location.hash).toBe('#/favorites');
+  });
+
+  it('should swipe correctly right after a tap navigation (stale-state regression)', async () => {
+    render(<App />);
+    expect(await screen.findByText('Aventus')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: 'Кошик' }));
+    expect(window.location.hash).toBe('#/cart');
+    swipe(mainEl(), 200, 200, 100, 200);
+    expect(window.location.hash).toBe('#/orders');
+  });
+
+  it('should apply a left-slide transition on forward navigation', async () => {
+    render(<App />);
+    expect(await screen.findByText('Aventus')).toBeInTheDocument();
+    swipe(mainEl(), 200, 200, 100, 200);
+    expect(document.querySelector('.fd-slide--left')).not.toBeNull();
+  });
+
+  it('should apply a right-slide transition on backward navigation', () => {
+    window.location.hash = '#/cart';
+    render(<App />);
+    swipe(mainEl(), 100, 200, 200, 205);
+    expect(window.location.hash).toBe('#/');
+    expect(document.querySelector('.fd-slide--right')).not.toBeNull();
+  });
+
+  it('should set slide direction on tap navigation', async () => {
+    render(<App />);
+    expect(await screen.findByText('Aventus')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: 'Обране' }));
+    expect(document.querySelector('.fd-slide--left')).not.toBeNull();
+    fireEvent.click(screen.getByRole('tab', { name: 'Каталог' }));
+    expect(document.querySelector('.fd-slide--right')).not.toBeNull();
+  });
+});

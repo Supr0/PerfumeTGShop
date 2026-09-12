@@ -144,6 +144,9 @@ export default function App() {
   const [locale, setLocale] = useState<Locale>(loadLocale);
   const [route, setRoute] = useState<Route>(readRoute);
   const [isAdmin, setIsAdmin] = useState(false);
+  // Slide direction of the last tab navigation (tap or swipe). Null on first
+  // paint so nothing animates until the user actually navigates.
+  const [slideDir, setSlideDir] = useState<'left' | 'right' | null>(null);
 
   useEffect(() => {
     initTma();
@@ -169,6 +172,15 @@ export default function App() {
   const tab = routeToTab(route);
 
   const goToTab = (next: Tab) => {
+    // Derive the current tab from the live hash, not the render closure:
+    // goToTab writes the hash synchronously, so rapid successive navigations
+    // (tap-then-swipe, swipe-swipe) always compare against the latest tab.
+    const current = routeToTab(readRoute());
+    const currentIndex = TABS.indexOf(current);
+    const nextIndex = TABS.indexOf(next);
+    if (currentIndex !== -1 && nextIndex !== -1 && nextIndex !== currentIndex) {
+      setSlideDir(nextIndex > currentIndex ? 'left' : 'right');
+    }
     window.location.hash = tabToHash(next);
     setRoute(parseHash(tabToHash(next)));
   };
@@ -207,8 +219,10 @@ export default function App() {
     const dy = touch.clientY - start.y;
     if (Math.abs(dy) >= SWIPE_MAX_DY) return;
     if (Math.abs(dx) < SWIPE_MIN_DX) return;
-    // Admin and other non-main routes stay tap-only.
-    const index = TABS.indexOf(tab);
+    // Admin and other non-main routes stay tap-only. The current tab is read
+    // from the live hash (never the render closure) so a swipe that follows
+    // a tap/swipe without an intervening re-render still lands correctly.
+    const index = TABS.indexOf(routeToTab(readRoute()));
     if (index === -1) return;
     if (dx < 0) {
       if (index >= TABS.length - 1) return;
@@ -233,6 +247,13 @@ export default function App() {
           swipeStartRef.current = null;
         }}
       >
+        {/* Keyed by route so the direction-aware slide animation replays on
+            every navigation; the key remount only affects what a route change
+            would unmount anyway. */}
+        <div
+          key={`${route.name}:${route.productId ?? ''}`}
+          className={slideDir ? `fd-slide--${slideDir}` : undefined}
+        >
         {route.name === 'catalog' && <Home locale={locale} />}
         {route.name === 'product' && route.productId != null && (
           <ProductPage key={route.productId} productId={route.productId} locale={locale} />
@@ -242,6 +263,7 @@ export default function App() {
         {route.name === 'orders' && <Orders locale={locale} />}
         {route.name === 'favorites' && <Favorites locale={locale} />}
         {route.name === 'admin' && <Admin locale={locale} />}
+        </div>
       </main>
       <TabBar
         tabs={visibleTabs}

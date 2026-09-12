@@ -1088,11 +1088,53 @@ form button[type='submit'] {
   width: 100%;
 }
 
-.fd-admin form label {
+.fd-admin form label:has(input[type='checkbox']) {
   display: flex;
   align-items: center;
   gap: 8px;
   color: var(--color-text);
+}
+
+/* FIX: text-field labels fall back to the block .fd-main label style above;
+   only checkbox rows stay inline. */
+
+/* ----- Tab slide transition (direction-aware, ~200ms) ----- */
+
+@keyframes fd-slide-left {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fd-slide-right {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.fd-slide--left {
+  animation: fd-slide-left 200ms ease-out;
+}
+
+.fd-slide--right {
+  animation: fd-slide-right 200ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fd-slide--left,
+  .fd-slide--right {
+    animation: none;
+  }
 }
 
 /* FIX-4: Хіт checkbox row — label + control on one clean line, checkbox
