@@ -123,8 +123,8 @@ function OrderRow({
     <tr>
       <td>{order.number}</td>
       <td>
-        <label htmlFor={`admin-order-status-${order.number}`}>{t('admin_status_label').replace('{number}', order.number)}</label>
-        <select id={`admin-order-status-${order.number}`} aria-label={t('admin_status_label').replace('{number}', order.number)} value={status} onChange={(e) => setStatus(e.target.value)}>
+        <label htmlFor={`admin-order-status-${order.number}`}>{t('admin_status_label')}</label>
+        <select id={`admin-order-status-${order.number}`} aria-label={`${t('admin_status_label')} ${order.number}`} value={status} onChange={(e) => setStatus(e.target.value)}>
           {ORDER_STATUSES.map((s) => (
             <option key={s} value={s}>
               {s}
@@ -133,8 +133,8 @@ function OrderRow({
         </select>
       </td>
       <td>
-        <label htmlFor={`admin-order-ttn-${order.number}`}>{t('admin_ttn_label').replace('{number}', order.number)}</label>
-        <input id={`admin-order-ttn-${order.number}`} aria-label={t('admin_ttn_label').replace('{number}', order.number)} value={ttn} onChange={(e) => setTtn(e.target.value)} />
+        <label htmlFor={`admin-order-ttn-${order.number}`}>{t('admin_ttn_label')}</label>
+        <input id={`admin-order-ttn-${order.number}`} aria-label={`${t('admin_ttn_label')} ${order.number}`} value={ttn} onChange={(e) => setTtn(e.target.value)} />
       </td>
       <td>
         <button type="button" disabled={saving} onClick={() => void save()}>
@@ -376,7 +376,7 @@ export default function Admin({
             </div>
           )}
           {section === 'orders' && (
-            <table aria-label={t('admin_orders_tab')}>
+            <table className="fd-admin__orders" aria-label={t('admin_orders_tab')}>
               <tbody>
                 {orders.map((o) => (
                   <OrderRow key={o.number} order={o} ordersUrl={ordersUrl} fetcher={fetcher} onSaved={notify} locale={locale} />

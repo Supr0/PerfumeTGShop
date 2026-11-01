@@ -1,0 +1,26 @@
+# Dependencies
+.git
+.gitignore
+.venv
+**/node_modules
+**/dist
+**/__pycache__
+**/*.py[cod]
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# Local state / secrets
+.env
+.env.local
+*.db
+preview.db
+seed.db
+
+# Non-runtime project folders
+docs
+.opencode
+.fdx
+.idea
+.vscode
+*.log

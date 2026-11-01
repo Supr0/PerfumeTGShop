@@ -1,0 +1,5 @@
+# Local development + test dependencies (never installed in the API image).
+-r requirements.txt
+pytest>=8.0
+httpx>=0.27
+aiosqlite>=0.20

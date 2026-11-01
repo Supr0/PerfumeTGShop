@@ -1061,6 +1061,65 @@ form button[type='submit'] {
   margin-bottom: 16px;
 }
 
+/* `display: block` on the table (for horizontal scroll) drops table layout for
+   its rows; restore it inside so cells keep their columns. */
+.fd-admin table tbody {
+  display: table;
+  width: 100%;
+  border-collapse: collapse;
+}
+
+/* Orders become stacked cards: every field has a visible label, so a cramped
+   four-column table on a 390px screen is unnecessary. */
+.fd-admin table.fd-admin__orders tbody {
+  display: block;
+}
+
+.fd-admin table.fd-admin__orders tr {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px 10px;
+  padding: 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.fd-admin table.fd-admin__orders tr:last-child {
+  border-bottom: 0;
+}
+
+.fd-admin table.fd-admin__orders td {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+}
+
+.fd-admin table.fd-admin__orders td:first-child {
+  grid-column: 1 / -1;
+  font-weight: 700;
+}
+
+.fd-admin table.fd-admin__orders td:last-child {
+  grid-column: 1 / -1;
+}
+
+.fd-admin table.fd-admin__orders td:last-child button {
+  width: 100%;
+}
+
+.fd-admin table.fd-admin__orders label {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--color-muted);
+}
+
+.fd-admin table.fd-admin__orders select,
+.fd-admin table.fd-admin__orders input {
+  width: 100%;
+}
+
 .fd-admin td {
   padding: 8px 10px;
   border-bottom: 1px solid var(--color-border);
